@@ -291,7 +291,15 @@ def _clean_response(response: str) -> str:
     except (json.JSONDecodeError, KeyError, IndexError, TypeError):
         pass  # Nie jest JSON, kontynuuj normalne czyszczenie
     
-    # 2. Spróbuj wyciągnąć JSON z regex (dla niepełnych JSON)
+    # 2. Usuń formaty typu {corrected} na początku (bez cudzysłowów)
+    # Przykład: "{corrected} Tekst..." → "Tekst..."
+    # Ale tylko jeśli to jest na samym początku tekstu
+    if text.strip().startswith('{corrected}'):
+        text = re.sub(r'^\{corrected\}\s*', '', text, flags=re.IGNORECASE | re.MULTILINE)
+    if text.strip().startswith('{filled}'):
+        text = re.sub(r'^\{filled\}\s*', '', text, flags=re.IGNORECASE | re.MULTILINE)
+    
+    # 3. Spróbuj wyciągnąć JSON z regex (dla niepełnych JSON)
     # Obsługuj różne formaty: {"key": "value"}, {key: "value"}, {'key': 'value'}
     json_patterns = [
         r'\{["\']?-filled["\']?\s*:\s*["\']([^"\']+)["\']\s*\}',  # {"-filled": "..."}
@@ -309,7 +317,7 @@ def _clean_response(response: str) -> str:
             text = match.group(1)
             break
     
-    # 3. Usuń formaty typu [{'text': '...', 'corrected': '...'}] lub [{"text": "...", "corrected": "..."}]
+    # 4. Usuń formaty typu [{'text': '...', 'corrected': '...'}] lub [{"text": "...", "corrected": "..."}]
     # Spróbuj najpierw sparsować jako JSON listę (z podwójnymi cudzysłowami)
     try:
         if text.strip().startswith('['):
@@ -356,7 +364,17 @@ def _clean_response(response: str) -> str:
     if match:
         text = match.group(1)
     
-    # 4. Usuń markdown formatting (ale zachowaj wulgaryzmy!)
+    # 5. Usuń pozostałe JSON-y w środku tekstu (jeśli LLM dodał JSON w środku)
+    # Przykład: "Tekst... [ { "text": "...", "corrected": "..." } ]"
+    # Usuń całe bloki JSON w nawiasach kwadratowych
+    text = re.sub(r'\s*\[\s*\{[^}]+\}\s*\]\s*', ' ', text, flags=re.IGNORECASE | re.DOTALL)
+    # Usuń również pojedyncze obiekty JSON w nawiasach klamrowych (jeśli nie są na początku)
+    # Ale tylko jeśli są w środku tekstu, nie na początku
+    if not text.strip().startswith('{'):
+        text = re.sub(r'\s*\{[^}]*"corrected"[^}]*\}\s*', ' ', text, flags=re.IGNORECASE | re.DOTALL)
+        text = re.sub(r'\s*\{[^}]*"text"[^}]*\}\s*', ' ', text, flags=re.IGNORECASE | re.DOTALL)
+    
+    # 6. Usuń markdown formatting (ale zachowaj wulgaryzmy!)
     text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)  # **bold**
     text = re.sub(r'\*([^*]+)\*', r'\1', text)      # *italic*
     text = re.sub(r'__([^_]+)__', r'\1', text)      # __bold__

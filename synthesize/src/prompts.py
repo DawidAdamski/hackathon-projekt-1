@@ -94,10 +94,12 @@ MORPHOLOGY_PROMPT = """Sprawdź i popraw morfologię poniższego tekstu.
 
 ZASADY POPRAWIANIA:
 - Jeśli imię jest żeńskie (np. Anna, Maria, Róża), czasowniki powinny być w formie żeńskiej
-- Jeśli imię jest męskie (np. Jan, Piotr, Adam, Oliwier), czasowniki powinny być w formie męskiej
-- Jeśli jest sprzeczność między imieniem a płcią (np. "Oliwier, kobieta"), popraw płć na zgodną z imieniem (np. "Oliwier, mężczyzna")
+- Jeśli imię jest męskie (np. Jan, Piotr, Adam, Oliwier, Konrad, Ryszard), czasowniki powinny być w formie męskiej
+- Jeśli jest sprzeczność między imieniem a płcią (np. "Konrad, kobieta"), popraw płć na zgodną z imieniem (np. "Konrad, mężczyzna")
 - Popraw przypadki gramatyczne (np. "w Warszawa" → "w Warszawie")
 - NIE zmieniaj samych danych (imion, nazwisk, miast, numerów) - tylko formy gramatyczne i sprzeczności płci
+- ZACHOWAJ wulgaryzmy jeśli są w tekście - NIE usuwaj ich, NIE zamieniaj na "możesz odejść"
+- NIE analizuj składni - TYLKO popraw morfologię
 
 PRZYKŁADY POPRAWEK (wejście → wyjście):
 
@@ -112,6 +114,15 @@ Wyjście: "Jan napisał list."
 Przykład 3:
 Wejście: "Oliwier, kobieta, ma 29 lat."
 Wyjście: "Oliwier, mężczyzna, ma 29 lat."
+
+Przykład 6:
+Wejście: "Konrad, 67 lat, kobieta. Mieszkam w Wyszków."
+Wyjście: "Konrad, 67 lat, mężczyzna. Mieszkam w Wyszkowie."
+
+Przykład 7:
+Wejście: "Jak się sprzeciwiam, mówi 'No Ryszard, jak ci się nie podoba, to wypierdalaj'."
+Wyjście: "Jak się sprzeciwiam, mówi 'No Konrad, jak ci się nie podoba, to wypierdalaj'."
+(NIE zmieniaj "wypierdalaj" na "możesz odejść" - zachowaj wulgaryzm!)
 
 Przykład 4:
 Wejście: "Mieszkam w Warszawa przy ul. Długa."

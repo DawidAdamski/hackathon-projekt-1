@@ -190,7 +190,7 @@ def process_file(
                         "line": line_number,
                         "original": result["original"],
                         "synthetic": result["final"],
-                        "phases": result["phases_used"],
+                        "phases": result["phases_used"],  # Dla debugowania - które fazy zostały użyte
                     }
                     jsonl_file.write(json.dumps(obj, ensure_ascii=False) + '\n')
                     jsonl_file.flush()  # Wymuś zapis do pliku
@@ -208,7 +208,7 @@ def process_file(
                         "line": line_number,
                         "original": error_result,
                         "synthetic": error_result,
-                        "phases": ["error"],
+                        "phases": ["error"],  # Dla debugowania - oznaczenie błędu
                     }
                     jsonl_file.write(json.dumps(obj, ensure_ascii=False) + '\n')
                     jsonl_file.flush()

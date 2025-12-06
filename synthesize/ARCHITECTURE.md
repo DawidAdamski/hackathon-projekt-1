@@ -4,6 +4,22 @@
 
 Prosty, efektywny moduł do syntezy danych PII w języku polskim. Zastępuje tokeny `[name]`, `[city]`, etc. w tekście syntetycznymi danymi z zachowaniem poprawnej morfologii.
 
+**Kluczowe cechy:**
+- ✅ 3-fazowy pipeline (Faker → LLM Fill → LLM Morphology)
+- ✅ Zapis na bieżąco (streaming) - wyniki widoczne natychmiast
+- ✅ Optymalizacja TEKST_JEST_TAKI_SAM - oszczędność tokenów
+- ✅ Obsługa wszystkich tokenów z dokumentacji DANE_BEZ_TWARZY.md
+- ✅ Prosta konfiguracja DSPy (wzorzec z TestDspy)
+- ✅ REST API + CLI
+
+**Kluczowe cechy:**
+- ✅ 3-fazowy pipeline (Faker → LLM Fill → LLM Morphology)
+- ✅ Zapis na bieżąco (streaming) - wyniki widoczne natychmiast
+- ✅ Optymalizacja TEKST_JEST_TAKI_SAM - oszczędność tokenów
+- ✅ Obsługa wszystkich tokenów z dokumentacji DANE_BEZ_TWARZY.md
+- ✅ Prosta konfiguracja DSPy (wzorzec z TestDspy)
+- ✅ REST API + CLI
+
 ---
 
 ## 🔄 Flow Danych
@@ -46,7 +62,7 @@ Prosty, efektywny moduł do syntezy danych PII w języku polskim. Zastępuje tok
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              OUTPUT                                         │
 │                   Pliki: output.txt + output.jsonl                          │
-│          (JSONL: {"line": N, "original": "...", "synthetic": "..."})        │
+│   (JSONL: {"line": N, "original": "...", "synthetic": "...", "phases": [...]}) │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -92,16 +108,45 @@ def init_llm(model: str = "ollama/PRIHLOP/PLLuM:latest"):
     return lm
 
 # Signature dla uzupełniania tokenów
-class FillTokens(dspy.Signature):
+class FillTokensSignature(dspy.Signature):
     """Uzupełnij brakujące tokeny [...] w tekście."""
     text: str = dspy.InputField(desc="Tekst z tokenami do uzupełnienia")
     filled: str = dspy.OutputField(desc="Tekst z uzupełnionymi tokenami")
 
 # Signature dla korekty morfologii
-class CorrectMorphology(dspy.Signature):
+class CorrectMorphologySignature(dspy.Signature):
     """Popraw morfologię tekstu (przypadki, formy czasowników)."""
     text: str = dspy.InputField(desc="Tekst do korekty")
     corrected: str = dspy.OutputField(desc="Tekst z poprawioną morfologią")
+
+# Funkcje główne
+def fill_tokens(text: str) -> str:
+    """Faza 2: Uzupełnij brakujące tokeny używając dspy.Predict."""
+    module = dspy.Predict(FillTokensSignature)
+    result = module(text=text)
+    return _clean_response(result.filled)  # Czyszczenie odpowiedzi LLM
+
+def correct_morphology(text: str) -> str:
+    """Faza 3: Popraw morfologię używając dspy.Predict."""
+    module = dspy.Predict(CorrectMorphologySignature)
+    result = module(text=text)
+    cleaned = _clean_response(result.corrected)
+    
+    # OPTYMALIZACJA: Obsługa TEKST_JEST_TAKI_SAM
+    if cleaned.strip().upper() == "TEKST_JEST_TAKI_SAM":
+        return text  # Zwróć oryginalny tekst
+    
+    return cleaned
+
+# Alternatywne funkcje z pełnymi promptami (fallback)
+def fill_tokens_with_prompt(text: str) -> str:
+    """Alternatywa używająca pełnych promptów zamiast dspy.Predict."""
+    # Używa bezpośrednio _lm() z pełnym promptem
+    
+def _clean_response(response: str) -> str:
+    """Czyści odpowiedź LLM z formatów JSON, markdown, prefiksów."""
+    # Usuwa: {corrected: "..."}, [{'text': '...'}], ```, "Oto poprawiony tekst:", etc.
+    # ZACHOWUJE wulgaryzmy
 ```
 
 ### 2. `faker_processor.py` - Faza 1
@@ -113,20 +158,26 @@ from faker import Faker
 fake = Faker('pl_PL')
 
 TOKEN_GENERATORS = {
-    "name": lambda: fake.first_name(),
-    "surname": lambda: fake.last_name(),
-    "city": lambda: fake.city(),
-    "address": lambda: fake.address().replace('\n', ', '),
-    "phone": lambda: fake.phone_number(),
-    "email": lambda: fake.email(),
-    "pesel": lambda: fake.numerify("###########"),
-    "age": lambda: str(fake.random_int(18, 80)),
-    "sex": lambda: fake.random_element(["mężczyzna", "kobieta"]),
-    "company": lambda: fake.company(),
-    "date": lambda: fake.date(),
-    "document-number": lambda: fake.bothify("???######").upper(),
-    "bank-account": lambda: fake.numerify("########################"),
+    # Dane osobowe
+    "name", "surname", "first_name", "last_name",
+    # Lokalizacja
+    "city", "address" (tylko ulica z numerem), "street",
+    # Kontakt
+    "phone", "email", "username", "user-name",
+    # Dokumenty
+    "pesel", "document-number", "document_number", "id-number", "id_number", "nip", "regon",
+    # Finanse
+    "bank-account", "bank_account", "iban", "credit-card", "credit-card-number", "credit_card_number",
+    # Inne
+    "age", "sex", "company", "date", "data", "date-of-birth", "date_of_birth",
+    "job", "job-title", "job_title", "school-name", "school_name",
+    # Wrażliwe
+    "political-view", "political_view", "health", "relative", "ethnicity",
+    "religion", "sexual-orientation", "sexual_orientation", "secret",
 }
+
+# UWAGA: address zwraca TYLKO ulicę z numerem (np. "ul. Długa 15")
+# bez kodu pocztowego i miasta, bo miasto jest osobno w [city]
 
 def process_with_faker(text: str) -> str:
     """Faza 1: Zastąp tokeny [...] wartościami z Fakera."""
@@ -197,6 +248,13 @@ def synthesize_line(line: str, use_llm: bool = True) -> dict:
 # Przetworz cały plik
 uv run python main.py process ../nask_train/orig.txt -o output.txt
 
+# Opcje dla process:
+uv run python main.py process input.txt -o output.txt \
+    --model "ollama/PRIHLOP/PLLuM:latest" \  # Model LLM
+    --no-llm \                                # Tylko Faker (bez LLM)
+    --no-jsonl \                              # Nie generuj .jsonl
+    --prompt-mode                             # Użyj pełnych promptów zamiast dspy.Predict
+
 # Testuj losową linijkę
 uv run python main.py test --random
 
@@ -206,8 +264,17 @@ uv run python main.py test --line 21
 # Testuj N losowych linijek
 uv run python main.py test --random-n 5
 
+# Opcje dla test:
+uv run python main.py test --line 21 \
+    --model "ollama/PRIHLOP/PLLuM:latest" \
+    --no-llm \                                # Tylko Faker
+    --prompt-mode                             # Pełne prompty
+
+# Pokaż obsługiwane tokeny
+uv run python main.py tokens
+
 # Uruchom REST API
-uv run python main.py serve --port 8000
+uv run python main.py serve --port 8000 --host 0.0.0.0
 ```
 
 ---
@@ -237,30 +304,44 @@ uv run python main.py serve --port 8000
 
 ---
 
-## 📊 Progress Bar
+## 📊 Progress Bar i Zapis na Bieżąco
 
 ```python
 from tqdm import tqdm
 
 def process_file(input_path: str, output_path: str):
+    # Otwórz pliki na początku (streaming write)
+    txt_file = open(output_path, 'w', encoding='utf-8', buffering=1)  # Line buffering
+    jsonl_file = open(output_path.replace('.txt', '.jsonl'), 'w', encoding='utf-8', buffering=1)
+    
     with open(input_path, 'r', encoding='utf-8') as f:
         lines = f.readlines()
     
-    results = []
-    for line in tqdm(lines, desc="Synthesizing", unit="lines"):
-        result = synthesize_line(line)
-        results.append(result)
-    
-    # Zapisz do .txt i .jsonl
-    with open(output_path, 'w', encoding='utf-8') as f:
-        for r in results:
-            f.write(r["final"] + '\n')
-    
-    with open(output_path.replace('.txt', '.jsonl'), 'w', encoding='utf-8') as f:
-        for i, r in enumerate(results, 1):
-            json.dump({"line": i, "original": r["original"], "synthetic": r["final"]}, f, ensure_ascii=False)
-            f.write('\n')
+    try:
+        for i, line in enumerate(tqdm(lines, desc="Synthesizing", unit="lines"), 1):
+            result = synthesize_line(line)
+            
+            # Zapisuj natychmiast po przetworzeniu (na bieżąco)
+            txt_file.write(result["final"] + '\n')
+            txt_file.flush()
+            
+            json.dump({
+                "line": i, 
+                "original": result["original"], 
+                "synthetic": result["final"],
+                "phases": result["phases_used"]  # Dla debugowania
+            }, jsonl_file, ensure_ascii=False)
+            jsonl_file.write('\n')
+            jsonl_file.flush()
+    finally:
+        txt_file.close()
+        jsonl_file.close()
 ```
+
+**Korzyści zapisu na bieżąco:**
+- Wyniki widoczne natychmiast w pliku
+- Jeśli proces się przerwie, nie tracimy już przetworzonych linii
+- Możliwość monitorowania postępu przez sprawdzanie pliku wyjściowego
 
 ---
 
@@ -296,6 +377,12 @@ output:
 
 ## 📝 Prompty
 
+Prompty są zoptymalizowane zgodnie z best practices:
+- **Few-shot examples** (wejście → wyjście)
+- **Przykłady złych odpowiedzi** (czego NIE robić)
+- **Wielokrotne przypomnienia** o formacie
+- **Optymalizacja TEKST_JEST_TAKI_SAM** - jeśli tekst nie wymaga zmian
+
 ```python
 # prompts.py
 
@@ -303,23 +390,42 @@ FILL_TOKENS_PROMPT = """
 W tekście są tokeny w nawiasach kwadratowych (np. [name], [city]).
 Podmień KAŻDY token na realistyczne polskie dane.
 
+OPTYMALIZACJA:
+Jeśli tekst NIE MA żadnych tokenów do uzupełnienia, 
+zwróć TYLKO: TEKST_JEST_TAKI_SAM
+To oszczędza tokeny!
+
+Przykłady (wejście → wyjście):
+- "Nazywam się [name] [surname]." → "Nazywam się Anna Kowalska."
+- "Tekst bez tokenów." → "TEKST_JEST_TAKI_SAM"
+
 KRYTYCZNE:
-- Zwróć TYLKO tekst z podmienionymi tokenami
-- BEZ komentarzy, BEZ wyjaśnień
-- Zachowaj resztę tekstu bez zmian
+- Zwróć TYLKO tekst z tokenami lub "TEKST_JEST_TAKI_SAM"
+- BEZ formatów JSON, BEZ komentarzy
 """
 
 MORPHOLOGY_PROMPT = """
 Sprawdź i popraw morfologię tekstu.
 
+OPTYMALIZACJA:
+Jeśli tekst NIE WYMAGA poprawek, zwróć: TEKST_JEST_TAKI_SAM
+
+Przykłady poprawek:
+- "Róża prosił o pomoc." → "Róża prosiła o pomoc."
+- "Oliwier, kobieta" → "Oliwier, mężczyzna"
+- "Poprawny tekst." → "TEKST_JEST_TAKI_SAM"
+
 KRYTYCZNE ZASADY:
 - NIE zmieniaj danych (imion, nazwisk, miast, numerów)
-- Poprawiaj TYLKO formy gramatyczne (przypadki, formy czasowników)
-- Jeśli "Róża prosił" → "Róża prosiła"
-- Jeśli "mieszkam w Warszawa" → "mieszkam w Warszawie"
-- Zwróć TYLKO poprawiony tekst, BEZ komentarzy
+- Poprawiaj TYLKO formy gramatyczne
+- Zwróć TYLKO tekst lub "TEKST_JEST_TAKI_SAM"
+- BEZ formatów JSON, BEZ markdown (```)
 """
 ```
+
+**Obsługa TEKST_JEST_TAKI_SAM w kodzie:**
+- Jeśli LLM zwróci `TEKST_JEST_TAKI_SAM`, kod zwraca oryginalny tekst
+- Oszczędza tokeny dla długich tekstów bez zmian
 
 ---
 
