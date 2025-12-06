@@ -26,7 +26,12 @@ MASK_PLACEHOLDERS = {
 }
 
 PESEL_REGEX = re.compile(r"\b\d{11}\b")
-PESEL_CONTEXT_REGEX = re.compile(r"\bPESEL\b[^0-9A-Za-z]{0,10}([0-9A-Za-z]{11})", re.IGNORECASE)
+PESEL_CONTEXT_REGEX = re.compile(
+    r"\bPESEL\b.{0,40}?([0-9A-Za-z]{11})",
+    re.IGNORECASE | re.DOTALL,
+)
+PESEL_CANDIDATE_REGEX = re.compile(r"\b[0-9A-Za-z]{11}\b")
+
 BANK_ACCOUNT_REGEX = re.compile(r"\b(?:PL\d{26}|\d{26})\b")
 CREDIT_CARD_REGEX = re.compile(r"\b(?:\d{4}[- ]?){3}\d{4}\b")
 AGE_REGEX = re.compile(r"\b\d{1,3}\s*(?:lat|lata|roku życia|r\.ż\.)\b", re.IGNORECASE)
@@ -101,6 +106,20 @@ PHONE_REGEX = re.compile(
     r"\b(?:\+?\d{1,3}[- ]?)?(?:\d{3}[- ]?){2,3}\d{2,4}\b"
 )
 
+PHONE_CONTEXT_REGEX = re.compile(
+    r"(?:(?:tel\.?|telefon|kom\.?|phone)\s*[:\-]?\s*|^\s*\+)\s*([0-9A-Za-z ()+\-]{7,25})",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+PHONE_LETTER_TO_DIGIT = {
+    "O": "0",
+    "o": "0",
+    "I": "1",
+    "i": "1",
+    "L": "1",
+    "l": "1",
+}
+
 
 class TextAnonymizer:
     def __init__(
@@ -165,6 +184,64 @@ class TextAnonymizer:
     def is_whitespace(self, token) -> bool:
         return any(ch in whitespace for ch in token.text)
 
+    def normalize_pesel_candidate(self, token: str) -> str | None:
+        if len(token) != 11:
+            return None
+        if not token.isalnum():
+            return None
+        letter_positions = [i for i, ch in enumerate(token) if ch.isalpha()]
+        if len(letter_positions) > 2:
+            return None
+        if not letter_positions:
+            if self.is_valid_pesel(token):
+                return token
+            return None
+        base_digits = []
+        for ch in token:
+            if ch.isdigit():
+                base_digits.append(ch)
+            elif ch.isalpha():
+                base_digits.append(None)
+            else:
+                return None
+        from itertools import product
+        for combo in product("0123456789", repeat=len(letter_positions)):
+            candidate_digits = list(base_digits)
+            for pos, digit in zip(letter_positions, combo):
+                candidate_digits[pos] = digit
+            candidate = "".join(candidate_digits)
+            if self.is_valid_pesel(candidate):
+                return candidate
+        return None
+
+    def normalize_phone_candidate(self, fragment: str) -> str | None:
+        digits = []
+        corrections = 0
+        for ch in fragment:
+            if ch.isdigit():
+                digits.append(ch)
+            elif ch in PHONE_LETTER_TO_DIGIT:
+                digits.append(PHONE_LETTER_TO_DIGIT[ch])
+                corrections += 1
+            elif ch in " -()+":
+                continue
+            elif ch.lower() in {"h", "q"}:
+                corrections += 1
+            elif ch.isalpha():
+                return None
+            else:
+                return None
+        if len(digits) < 7:
+            return None
+        if corrections > 3:
+            return None
+        number = "".join(digits)
+        if len(number) not in (9, 11):
+            return None
+        if len(number) == 11 and not number.startswith("48"):
+            return None
+        return number
+
     def placeholder_for_token(self, token) -> str:
         mask_name = getattr(token._, "mask", None)
         if mask_name == "persname_mask":
@@ -193,7 +270,9 @@ class TextAnonymizer:
             ):
                 return "{school-name}"
             return "{company}"
-        return MASK_PLACEHOLDERS.get(mask_name, "{secret}")
+        return MASK_PLACEHOLDERS.get(mask_name, "{secret}"
+
+        )
 
     def build_regex_spans(self, text: str):
         spans = []
@@ -209,9 +288,13 @@ class TextAnonymizer:
                 add_span(match.start(), match.end(), "{pesel}")
 
         for match in PESEL_CONTEXT_REGEX.finditer(text):
-            start = match.start(1)
-            end = match.end(1)
-            add_span(start, end, "{pesel}")
+            add_span(match.start(1), match.end(1), "{pesel}")
+
+        for match in PESEL_CANDIDATE_REGEX.finditer(text):
+            raw = match.group(0)
+            normalized = self.normalize_pesel_candidate(raw)
+            if normalized is not None:
+                add_span(match.start(), match.end(), "{pesel}")
 
         for match in BANK_ACCOUNT_REGEX.finditer(text):
             add_span(match.start(), match.end(), "{bank-account}")
@@ -219,6 +302,14 @@ class TextAnonymizer:
         for match in CREDIT_CARD_REGEX.finditer(text):
             if self.is_valid_credit_card(match.group(0)):
                 add_span(match.start(), match.end(), "{credit-card-number}")
+
+        for match in PHONE_CONTEXT_REGEX.finditer(text):
+            raw_fragment = match.group(1)
+            normalized = self.normalize_phone_candidate(raw_fragment)
+            if normalized is not None:
+                start = match.start(1)
+                end = match.end(1)
+                add_span(start, end, "{phone}")
 
         pattern_placeholders = [
             (AGE_REGEX, "{age}"),
@@ -252,6 +343,10 @@ class TextAnonymizer:
     def compress_placeholders(self, text: str) -> str:
         text = re.sub(r"\{address\}\s*-\s*\{address\}", "{address}", text)
         text = re.sub(r"(?:\{address\})(?:\s+\{address\})+", "{address}", text)
+        text = re.sub(r"\{date\}\s*-\s*\{date\}", "{date}", text)
+        text = re.sub(r"(?:\{date\})(?:\s+\{date\})+", "{date}", text)
+        text = re.sub(r"\{company\}\s*-\s*\{company\}", "{company}", text)
+        text = re.sub(r"(?:\{company\})(?:\s+\{company\})+", "{company}", text)
         return text
 
     def mask(self, text: str) -> str:
