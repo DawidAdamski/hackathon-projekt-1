@@ -1,0 +1,34 @@
+# Konfiguracja modułu Synthesize
+
+# Model LLM
+llm:
+  # Domyślny model (Ollama local)
+  model: "ollama/PRIHLOP/PLLuM:latest"
+  
+  # Alternatywne modele:
+  # model: "ollama/gemma3:12b"
+  # model: "ollama/llama3.1:latest"
+  # model: "openai/gpt-4"  # wymaga OPENAI_API_KEY
+
+# Faker
+faker:
+  locale: "pl_PL"
+
+# Output
+output:
+  generate_jsonl: true
+  encoding: "utf-8"
+
+# Przetwarzanie
+processing:
+  # Użyj LLM domyślnie
+  use_llm: true
+  
+  # Użyj pełnych promptów zamiast dspy.Predict (wolniejsze ale lepsze)
+  use_prompt_mode: false
+
+# Ścieżki domyślne
+paths:
+  default_input: "../nask_train/orig.txt"
+  default_output: "./output"
+
