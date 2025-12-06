@@ -2,3 +2,7 @@ presidio-analyzer
 presidio-anonymizer
 pydantic
 faker
+priv_masker
+spacy-transformers
+morfeusz2
+pexpect
