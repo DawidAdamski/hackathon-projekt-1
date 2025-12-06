@@ -2,10 +2,13 @@ SHELL := /bin/bash
 
 DC := docker compose
 
-.PHONY: up down logs backend-shell migrate downgrade makemigration reset-db
+.PHONY: up down logs backend-shell migrate downgrade makemigration reset-db build
+
+build:
+	$(DC) up -d --build
 
 up:
-	$(DC) up -d --build
+	$(DC) up -d
 
 down:
 	$(DC) down
