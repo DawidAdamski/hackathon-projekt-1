@@ -8,10 +8,10 @@
 ## 1. Definicja Produktu
 
 ### Zwięzły opis produktu (The "Elevator Pitch")
-Budujemy prostą aplikację webową, która pozwala użytkownikowi wkleić tekst w języku polskim i natychmiast otrzymać jego wersję z automatycznie usuniętymi kluczowymi danymi osobowymi (imiona, nazwiska, PESEL).
+Budujemy bibliotekę Python, która automatycznie wykrywa i anonimizuje dane osobowe w tekstach konwersacyjnych w języku polskim, zastępując je tokenami zastępczymi (np. `{name}`, `{pesel}`). Rozwiązanie jest przeznaczone do integracji z potokami przetwarzania danych dla treningu modelu PLLuM.
 
 ### Kluczowy problem (Core Pain Point)
-Umożliwienie błyskawicznej i łatwej anonimizacji fragmentów tekstu bez potrzeby manualnej, żmudnej pracy i specjalistycznej wiedzy.
+Potrzeba precyzyjnej anonimizacji danych osobowych w tekstach polskich z zachowaniem struktury gramatycznej i sensu, przy jednoczesnym rozróżnianiu kontekstu (np. miasto jako miejsce zdarzenia vs adres zamieszkania) oraz obsłudze fleksji języka polskiego.
 
 ---
 
@@ -19,22 +19,36 @@ Umożliwienie błyskawicznej i łatwej anonimizacji fragmentów tekstu bez potrz
 
 ### Najkrótsza ścieżka do wartości (Kluczowe funkcjonalności MVP)
 
-- Prosty interfejs webowy z jednym polem do wklejenia tekstu.
-- Backendowy mechanizm anonimizacji, który identyfikuje i zastępuje tylko imiona, nazwiska, numery PESEL i adresy e-mail.
-- Wyświetlenie zanonimizowanego tekstu w drugim polu tekstowym na tej samej stronie.
+**Core MVP (Minimum dla oceny):**
+- Biblioteka Python przyjmująca tekst i zwracająca zanonimizowaną wersję
+- Wykrywanie i anonimizacja **podstawowych kategorii PII:**
+  - `{name}` – imiona
+  - `{surname}` – nazwiska
+  - `{pesel}` – numery PESEL
+  - `{email}` – adresy e-mail
+  - `{phone}` – numery telefonów
+  - `{address}` – podstawowe adresy (z rozróżnieniem kontekstu)
+- Podstawowe rozróżnianie kontekstu: `{city}` vs `{address}`
+- Obsługa fleksji polskiej dla imion i nazwisk
+
+**Rozszerzone MVP (dla wyższej oceny):**
+- Dodatkowe kategorie: `{age}`, `{date-of-birth}`, `{document-number}`, `{bank-account}`
+- Moduł generacji danych syntetycznych z zachowaniem morfologii
+- Większa precyzja w rozróżnianiu kontekstu
 
 ### Ścieżki użytkownika (User Stories dla MVP)
 
-- **Jako prawnik**, chcę wkleić fragment umowy do aplikacji i natychmiast otrzymać tekst z zanonimizowanymi nazwiskami i numerami PESEL, aby móc go bezpiecznie przesłać dalej.
+- **Jako Inżynier Danych**, chcę zintegrować bibliotekę z pipeline'em przetwarzania danych, aby automatycznie anonimizować teksty przed treningiem modelu PLLuM.
 
-- **Jako pracownik HR**, chcę wkleić treść CV i otrzymać wersję bez danych kontaktowych (e-mail), aby udostępnić ją wewnątrz firmy zgodnie z zasadami.
+- **Jako Badacz ML**, chcę przetworzyć zbiór tekstów konwersacyjnych i otrzymać zanonimizowaną wersję z poprawnie rozpoznanymi kategoriami PII, zachowując strukturę gramatyczną.
 
 ### Poza zakresem MVP (Out of Scope)
 
-- Obsługa wgrywania/pobierania plików (np. .txt, .docx).
-- Identyfikacja złożonych PII, takich jak adresy zamieszkania czy numery NIP.
-- Możliwość konfiguracji placeholderów przez użytkownika.
-- System logowania czy historia przetwarzanych dokumentów.
+- Interfejs webowy (rozwiązanie to biblioteka Python, nie aplikacja webowa)
+- Wszystkie 24+ kategorie PII (MVP skupia się na podstawowych)
+- Zaawansowany moduł generacji syntetycznej (może być uproszczony w MVP)
+- Obsługa plików binarnych (.docx) – tylko tekst surowy
+- Zewnętrzne API (rozwiązanie musi być offline)
 
 ---
 
@@ -42,27 +56,45 @@ Umożliwienie błyskawicznej i łatwej anonimizacji fragmentów tekstu bez potrz
 
 ### Metryki sukcesu
 
-- Aplikacja zwraca wynik dla tekstu o długości 5000 znaków w czasie poniżej 10 sekund.
-- Skuteczność (F1-score) w wykrywaniu imion, nazwisk i numerów PESEL na przygotowanym zestawie testowym jest wyższa niż 85%.
-- Prototyp jest w stanie obsłużyć co najmniej 5 jednoczesnych zapytań bez awarii.
+**Kryteria oceny (zgodnie z zadaniem):**
+- **F1-score** dla wszystkich klas ≥ 0.85 (35% wagi oceny)
+- **Minimalizacja False Negatives** – wykrycie wszystkich danych wrażliwych jest krytyczne
+- **Wydajność:** Przetwarzanie próbki danych w rozsądnym czasie (20% wagi)
+- **Poprawność rozróżniania kontekstu:** Szczególnie `{city}` vs `{address}` oraz fleksja (15% wagi)
+- **Jakość kodu i dokumentacja:** Łatwość wdrożenia, konteneryzacja (20% wagi)
+
+**Metryki techniczne:**
+- Biblioteka zwraca wynik dla tekstu o długości 5000 znaków w czasie poniżej 10 sekund
+- Rozwiązanie działa offline (bez zewnętrznych API)
+- Kod jest gotowy do integracji z data pipelines
 
 ---
 
 ## 4. Sugerowany stack technologiczny (Python)
 
-### Backend/API
-**FastAPI** – ze względu na wysoką wydajność, prostotę użycia i automatycznie generowaną dokumentację, co jest kluczowe w warunkach hackathonu.
+### Biblioteka Python
+Rozwiązanie powinno być **biblioteką Python** (nie aplikacją webową), gotową do integracji z data pipelines.
 
 ### Analiza danych/AI
 
-- **spaCy** z modelem dla języka polskiego (`pl_core_news_lg`) do podstawowego NER (identyfikacja osób).
-- **Wyrażenia regularne** (moduł `re`) do niezawodnego wykrywania wzorców o stałej strukturze, takich jak PESEL, NIP, adresy e-mail i numery telefonów.
+**Dozwolone technologie (offline, open-source):**
+- **spaCy** z modelem dla języka polskiego (`pl_core_news_lg`) do podstawowego NER
+- **HuggingFace Transformers** z modelami polskimi (HerBERT, PolBERT, PLLuM)
+- **Flair** – biblioteka NLP z modelami dla języka polskiego
+- **Wyrażenia regularne** (moduł `re`) do niezawodnego wykrywania wzorców o stałej strukturze (PESEL, e-mail, telefon, numery dokumentów)
 
-### Interfejs użytkownika
-**Streamlit** – pozwala na błyskawiczne stworzenie interaktywnego interfejsu webowego bezpośrednio w Pythonie, bez konieczności pisania kodu HTML/CSS/JS. Jest idealny do szybkiego prototypowania.
+**Podejście hybrydowe (rekomendowane):**
+- Kombinacja RegEx (dla struktur stałych) + modele ML (dla kontekstu i fleksji)
+- To podejście jest punktowane w kryteriach oceny (10% za pomysłowość)
+
+### Generacja danych syntetycznych
+- Biblioteki do morfologii polskiej (np. `pymorphy2`, `morfeusz2`)
+- Generatory wartości z kategorii z zachowaniem odmiany
 
 ### Inne
-Brak – dla zdefiniowanego MVP żadne dodatkowe narzędzia nie są potrzebne.
+- **Docker** – konteneryzacja rozwiązania (wymagane dla łatwości wdrożenia)
+- **pytest** – testy jednostkowe
+- **README** z instrukcją instalacji (`pip install -r requirements.txt`)
 
 ---
 
@@ -72,5 +104,16 @@ Brak – dla zdefiniowanego MVP żadne dodatkowe narzędzia nie są potrzebne.
 **Wysoka**
 
 ### Uzasadnienie
-Zakres MVP jest celowo wąski i skupia się na kluczowych funkcjonalnościach. Wykorzystanie bibliotek takich jak Streamlit (dla UI) oraz połączenie spaCy z wyrażeniami regularnymi (dla logiki) drastycznie skraca czas dewelopmentu. Największe ryzyko – niska dokładność modelu NER – jest łagodzone przez użycie regexów dla danych o przewidywalnej strukturze. Rezygnacja z obsługi plików na rzecz wklejanego tekstu eliminuje złożoność związaną z parsowaniem.
+Zakres MVP skupia się na podstawowych kategoriach PII (name, surname, pesel, email, phone, address) oraz kluczowym rozróżnianiu kontekstu. Podejście hybrydowe (RegEx + ML) pozwala na szybką implementację przy zachowaniu akceptowalnej dokładności. Największe wyzwania:
+
+1. **Rozróżnianie kontekstu** – wymaga analizy semantycznej, ale można użyć prostych heurystyk w MVP
+2. **Fleksja polska** – modele NER + słowniki odmian mogą pomóc
+3. **Offline processing** – wyklucza zewnętrzne API, ale dostępne są dobre modele open-source
+
+**Ryzyka:**
+- Niska dokładność dla rzadkich kategorii PII (można skupić się na podstawowych w MVP)
+- Wydajność przy dużych zbiorach danych (optymalizacja może być w wersji rozszerzonej)
+- Generacja syntetyczna z morfologią (może być uproszczona w MVP)
+
+**Strategia:** Zaimplementować solidne podstawy (6-8 kategorii) z dobrym F1-score, a następnie rozszerzać o dodatkowe kategorie i moduł syntetyczny.
 
