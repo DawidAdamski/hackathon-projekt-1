@@ -6,3 +6,4 @@ priv_masker
 spacy-transformers
 morfeusz2
 pexpect
+dbfread

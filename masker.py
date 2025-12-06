@@ -34,7 +34,10 @@ PESEL_CANDIDATE_REGEX = re.compile(r"\b[0-9A-Za-z]{11}\b")
 
 BANK_ACCOUNT_REGEX = re.compile(r"\b(?:PL\d{26}|\d{26})\b")
 CREDIT_CARD_REGEX = re.compile(r"\b(?:\d{4}[- ]?){3}\d{4}\b")
-AGE_REGEX = re.compile(r"\b\d{1,3}\s*(?:lat|lata|roku życia|r\.ż\.)\b", re.IGNORECASE)
+AGE_REGEX = re.compile(
+    r"\b\d{1,3}[A-Za-z]?\s*(?:lat|lata|roku życia|r\.ż\.)\b",
+    re.IGNORECASE,
+)
 DOB_REGEX = re.compile(
     r"\b(?:ur\.?|urodzony|urodzona|data urodzenia)\b[^0-9]{0,20}"
     r"(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})",
@@ -107,17 +110,45 @@ PHONE_REGEX = re.compile(
 )
 
 PHONE_CONTEXT_REGEX = re.compile(
-    r"(?:(?:tel\.?|telefon|kom\.?|phone)\s*[:\-]?\s*|^\s*\+)\s*([0-9A-Za-z ()+\-]{7,25})",
-    re.IGNORECASE | re.MULTILINE,
+    r"(?:(?:tel\.?|telefon|kom\.?|phone|fax)\s*[:\-]?\s*|\+)\s*([0-9OoqQbBgGhHiIlL ()+\-]{7,32})",
+    re.IGNORECASE,
 )
 
 PHONE_LETTER_TO_DIGIT = {
     "O": "0",
     "o": "0",
+    "Q": "0",
+    "q": "0",
     "I": "1",
     "i": "1",
     "L": "1",
     "l": "1",
+    "B": "8",
+    "b": "8",
+    "G": "9",
+    "g": "9",
+}
+
+DOCUMENT_NUMBER_CONTEXT_REGEX = re.compile(
+    r"\b(?:NIP|REGON|Nr|nr|ZDP|GK|GN|MAP|Ewid|EWID)\b",
+    re.IGNORECASE,
+)
+
+MONTH_WORDS = {
+    "stycznia",
+    "lutego",
+    "marca",
+    "kwietnia",
+    "maja",
+    "czerwca",
+    "lipca",
+    "sierpnia",
+    "września",
+    "wrzesnia",
+    "października",
+    "pazdziernika",
+    "listopada",
+    "grudnia",
 }
 
 
@@ -225,7 +256,7 @@ class TextAnonymizer:
                 corrections += 1
             elif ch in " -()+":
                 continue
-            elif ch.lower() in {"h", "q"}:
+            elif ch.lower() in {"h"}:
                 corrections += 1
             elif ch.isalpha():
                 return None
@@ -242,6 +273,34 @@ class TextAnonymizer:
             return None
         return number
 
+    def should_mask_date_token(self, token) -> bool:
+        text_val = token.text
+        lower = text_val.lower()
+        if re.search(r"\d{1,2}[./-]\d{1,2}[./-]\d{2,4}", text_val):
+            return True
+        if lower in MONTH_WORDS:
+            return True
+        doc = token.doc
+        start = max(0, token.i - 3)
+        end = min(len(doc), token.i + 4)
+        window = " ".join(t.text.lower() for t in doc[start:end])
+        date_keywords = [
+            "z dnia",
+            "data urodzenia",
+            "urodzony",
+            "urodzona",
+            "urodz.",
+            "rok",
+            "r.",
+            "r ",
+            "dnia",
+        ]
+        if any(kw in window for kw in date_keywords):
+            return True
+        if any(month in window for month in MONTH_WORDS):
+            return True
+        return False
+
     def placeholder_for_token(self, token) -> str:
         mask_name = getattr(token._, "mask", None)
         if mask_name == "persname_mask":
@@ -255,9 +314,16 @@ class TextAnonymizer:
                 return "{email}"
             return "{phone}"
         if mask_name == "address_mask":
+            digits_count = sum(ch.isdigit() for ch in token.text)
+            if digits_count >= 7:
+                normalized = self.normalize_phone_candidate(token.text)
+                if normalized is not None:
+                    return "{phone}"
             return "{address}"
         if mask_name == "date_mask":
-            return "{date}"
+            if self.should_mask_date_token(token):
+                return "{date}"
+            return token.text
         if mask_name == "id_numbers_mask":
             if self.is_valid_pesel(token.text):
                 return "{pesel}"
@@ -270,9 +336,7 @@ class TextAnonymizer:
             ):
                 return "{school-name}"
             return "{company}"
-        return MASK_PLACEHOLDERS.get(mask_name, "{secret}"
-
-        )
+        return MASK_PLACEHOLDERS.get(mask_name, "{secret}")
 
     def build_regex_spans(self, text: str):
         spans = []
@@ -311,6 +375,14 @@ class TextAnonymizer:
                 end = match.end(1)
                 add_span(start, end, "{phone}")
 
+        for m in re.finditer(r"\b(?:NIP|REGON|Nr|nr|ZDP|GK|GN|MAP|Ewid|EWID)\b[^\n\r]{0,30}", text):
+            prefix_end = m.end()
+            num_match = re.search(r"\d[\d\s\-]{5,}", text[prefix_end:prefix_end + 40])
+            if num_match:
+                start = prefix_end + num_match.start()
+                end = prefix_end + num_match.end()
+                add_span(start, end, "{document-number}")
+
         pattern_placeholders = [
             (AGE_REGEX, "{age}"),
             (DOB_REGEX, "{date-of-birth}"),
@@ -330,12 +402,26 @@ class TextAnonymizer:
             (JOB_TITLE_REGEX, "{job-title}"),
             (USERNAME_SOCIAL_REGEX, "{username}"),
             (EMAIL_REGEX, "{email}"),
-            (PHONE_REGEX, "{phone}"),
         ]
 
         for pattern, placeholder in pattern_placeholders:
             for match in pattern.finditer(text):
                 add_span(match.start(), match.end(), placeholder)
+
+        for match in PHONE_REGEX.finditer(text):
+            start, end = match.start(), match.end()
+            overlap = False
+            for es, ee, _ in spans:
+                if not (end <= es or start >= ee):
+                    overlap = True
+                    break
+            if overlap:
+                continue
+            prefix = text[max(0, start - 20):start].lower()
+            if DOCUMENT_NUMBER_CONTEXT_REGEX.search(prefix):
+                add_span(start, end, "{document-number}")
+            else:
+                add_span(start, end, "{phone}")
 
         spans.sort(key=lambda span: span[0])
         return spans
@@ -403,10 +489,16 @@ class TextAnonymizer:
 
 
 if __name__ == "__main__":
+    import random
+
     anonymizer = TextAnonymizer()
     test_data_path = "nask_train/anonymized.txt"
     with open(test_data_path, "r", encoding="utf-8") as f:
-        test_lines = [line.strip() for line in f.readlines()[:25]]
+        all_lines = [line.strip() for line in f.readlines()]
+
+    sample_size = min(100, len(all_lines))
+    test_lines = random.sample(all_lines, sample_size)
+
     for idx, text in enumerate(test_lines):
         masked_text = anonymizer.mask(text)
         anonymizer.print_comparison(text, masked_text, idx)
