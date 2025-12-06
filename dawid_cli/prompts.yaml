@@ -1,0 +1,176 @@
+# Prompts for LLM-based data generation and context analysis
+# This file contains all prompts used by the anonymizer
+
+# System prompt - general instructions for the LLM
+system_prompt: |
+  Jesteś ekspertem od poprawiania syntetycznych danych osobowych w języku polskim.
+  
+  KRYTYCZNE ZASADY:
+  - ZAWSZE zwracaj TYLKO poprawiony tekst, BEZ żadnych komentarzy, wyjaśnień, nagłówków
+  - NIE dodawaj tekstów typu "Oto poprawiony tekst:", "Poprawiona wersja:", itp.
+  - NIE generuj danych na nowo - poprawiaj TYLKO to co już jest w tekście
+  - Zachowaj wszystkie istniejące dane - zmieniaj TYLKO to co jest niepoprawne
+  - Używaj tylko polskich znaków diakrytycznych (ą, ć, ę, ł, ń, ó, ś, ź, ż)
+  - Zwróć CAŁY tekst, nie tylko fragmenty
+
+# Prompt for filling missing tokens (Process 1) - WARUNKOWY (tylko jeśli są tokeny [ ])
+fill_tokens_prompt: |
+  W tekście są tokeny w nawiasach kwadratowych (np. [name], [city], [address]) które nie zostały zastąpione.
+  
+  TWOIM ZADANIEM:
+  - Znajdź WSZYSTKIE tokeny w nawiasach kwadratowych [ ]
+  - Zastąp każdy token odpowiednią wartością syntetyczną
+  - NIE zmieniaj NICZEGO innego w tekście - TYLKO podmieniaj tokeny na wartości
+  - NIE dodawaj formatowania (gwiazdki, podkreślenia, itp.)
+  - NIE dodawaj komentarzy ani wyjaśnień
+  
+  Przykłady zamiany:
+  - [name] → Jan
+  - [city] → Warszawa
+  - [address] → ul. Długa 15, 00-001 Warszawa
+  - [phone] → +48 123 456 789
+  - [email] → jan.kowalski@example.com
+  
+  KRYTYCZNE: Zwróć TYLKO tekst z podmienionymi tokenami. BEZ formatowania, BEZ komentarzy, BEZ wyjaśnień. TYLKO czysty tekst.
+
+# Prompt for morphology correction (Process 2) - ZAWSZE wykonywany
+morphology_correction_prompt: |
+  W tekście są dane syntetyczne wygenerowane przez Faker. Sprawdź morfologię i popraw BŁĘDY gramatyczne.
+  
+  KRYTYCZNE ZASADY - PRZECZYTAJ UWAŻNIE:
+  - NIE ZMIENIAJ ŻADNYCH DANYCH - używasz TYCH SAMYCH imion, nazwisk, adresów, numerów telefonów, emaili
+  - Jeśli w tekście jest "Róża Andreasik" → ZOSTAJE "Róża Andreasik" (tylko popraw formę czasownika/przymiotnika jeśli błąd)
+  - Jeśli w tekście jest "prosił" a powinno być "prosiła" (bo Róża to kobieta) → popraw na "prosiła"
+  - Jeśli w tekście jest "mieszkam w Warszawa" → popraw na "mieszkam w Warszawie" (TAKI SAM tekst, tylko poprawiona forma)
+  - NIE generuj nowych danych - używaj TYCH SAMYCH wartości które są w tekście
+  
+  TWOIM ZADANIEM:
+  - Sprawdź czy wszystkie dane osobowe są w POPRAWNYM przypadku gramatycznym
+  - Popraw TYLKO błędy gramatyczne - zmiany MINIMALNE
+  - NIE zmieniaj imion, nazwisk, miast, adresów, numerów - poprawiaj TYLKO formy gramatyczne (przypadki, formy czasowników)
+  
+  Przykłady MINIMALNYCH poprawek (TYLKO morfologia, NIE zmiana danych):
+  - "Róża prosił" → "Róża prosiła" (poprawa formy czasownika, TAKI SAM tekst)
+  - "mieszkam w Warszawa" → "mieszkam w Warszawie" (poprawa miejscownika, TAKI SAM tekst)
+  - "dane Jana Kowalski" → "dane Jana Kowalskiego" (poprawa dopełniacza, TAKI SAM tekst)
+  - "telefon do Anna" → "telefon do Anny" (poprawa dopełniacza, TAKI SAM tekst)
+  
+  KRYTYCZNE: 
+  - Zwróć TYLKO tekst z poprawioną morfologią - BEZ komentarzy, BEZ wyjaśnień, BEZ formatowania
+  - NIE dodawaj tekstów typu "z zachowaniem oryginalnych danych" - TYLKO poprawiony tekst
+  - NIE zmieniaj danych - poprawiaj TYLKO formy gramatyczne
+  - Używaj TYCH SAMYCH imion, nazwisk, miast, adresów - tylko popraw przypadki i formy czasowników
+
+# Context analysis prompt - for determining if a token is person, address, or city
+context_analysis_prompt: |
+  Przeanalizuj kontekst i określ, czy token [token] w poniższym tekście to:
+  - imię osoby (jeśli jest w kontekście osoby, np. "Inż [name] [surname]")
+  - część adresu (jeśli jest w kontekście adresu, np. "ulica [name]")
+  - nazwa miejscowości (jeśli jest w kontekście miejsca)
+  
+  Tekst: {context}
+  
+  Odpowiedz TYLKO jednym słowem: "osoba", "adres", "miejscowosc", lub "nieznane".
+
+# Entity generation prompts - specific prompts for each entity type
+# UWAGA: Kontekst zawiera tekst, gdzie Faker już wstępnie wygenerował dane.
+# Twoim zadaniem jest poprawienie morfologii i uzupełnienie pozostałości.
+# Tokeny w tekście są w formacie [name], [city], itd. (nawiasy kwadratowe)
+
+entity_prompts:
+  "{name}": |
+    W kontekście jest tekst z wstępnie wygenerowanymi danymi przez Faker.
+    Wygeneruj polskie imię męskie lub żeńskie w poprawnym przypadku gramatycznym (zgodnie z kontekstem zdania).
+    Jeśli w tekście są pozostałości typu [name] - podmień je.
+    Tylko imię, bez dodatkowych słów.
+    Przykład: Jan (mianownik), Jana (dopełniacz), Janowi (celownik)
+    
+  "{surname}": |
+    W kontekście jest tekst z wstępnie wygenerowanymi danymi przez Faker.
+    Wygeneruj polskie nazwisko w poprawnym przypadku gramatycznym (zgodnie z kontekstem zdania).
+    Jeśli w tekście są pozostałości typu [surname] - podmień je.
+    Tylko nazwisko, bez dodatkowych słów.
+    Przykład: Kowalski (mianownik), Kowalskiego (dopełniacz)
+    
+  "{city}": |
+    W kontekście jest tekst z wstępnie wygenerowanymi danymi przez Faker.
+    Wygeneruj nazwę polskiego miasta w TYM SAMYM przypadku gramatycznym co oryginał w kontekście.
+    Jeśli w tekście są pozostałości typu [city] - podmień je.
+    Tylko nazwa miasta, bez dodatkowych słów.
+    Przykład: Warszawa (mianownik), Warszawy (dopełniacz), Warszawie (miejscownik)
+    
+  "{address}": |
+    W kontekście jest tekst z wstępnie wygenerowanymi danymi przez Faker.
+    Wygeneruj polski adres w formacie: ulica, numer, kod pocztowy, miasto.
+    Jeśli w tekście są pozostałości typu [address] - podmień je.
+    Wszystko w jednej linii, oddzielone spacjami lub przecinkami.
+    Przykład: ul. Długa 15, 00-001 Warszawa
+    
+  "{phone}": |
+    W kontekście jest tekst z wstępnie wygenerowanymi danymi przez Faker.
+    Wygeneruj polski numer telefonu w formacie +48 XXX XXX XXX lub XXX XXX XXX.
+    Jeśli w tekście są pozostałości typu [phone] - podmień je.
+    Tylko numer, bez dodatkowych słów.
+    Przykład: +48 123 456 789
+    
+  "{email}": |
+    W kontekście jest tekst z wstępnie wygenerowanymi danymi przez Faker.
+    Wygeneruj adres email.
+    Jeśli w tekście są pozostałości typu [email] - podmień je.
+    Tylko adres email, bez dodatkowych słów.
+    Przykład: jan.kowalski@example.com
+    
+  "{pesel}": |
+    W kontekście jest tekst z wstępnie wygenerowanymi danymi przez Faker.
+    Wygeneruj 11-cyfrowy numer PESEL.
+    Jeśli w tekście są pozostałości typu [pesel] - podmień je.
+    Tylko cyfry, bez spacji, bez myślników.
+    Przykład: 90010112345
+    
+  "{document-number}": |
+    W kontekście jest tekst z wstępnie wygenerowanymi danymi przez Faker.
+    Wygeneruj numer dokumentu (dowód osobisty, paszport, itp.).
+    Jeśli w tekście są pozostałości typu [document-number] - podmień je.
+    Tylko numer, bez dodatkowych słów.
+    Przykład: ABC123456
+    
+  "{age}": |
+    W kontekście jest tekst z wstępnie wygenerowanymi danymi przez Faker.
+    Wygeneruj wiek jako liczbę.
+    Jeśli w tekście są pozostałości typu [age] - podmień je.
+    Tylko liczba, bez słowa "lat" czy innych dodatków.
+    Przykład: 35
+    
+  "{sex}": |
+    W kontekście jest tekst z wstępnie wygenerowanymi danymi przez Faker.
+    Wygeneruj płeć: "mężczyzna" lub "kobieta" (zgodnie z kontekstem - jeśli jest imię, dopasuj płeć).
+    Jeśli w tekście są pozostałości typu [sex] - podmień je.
+    Tylko jedno słowo, bez dodatkowych słów.
+    Przykład: mężczyzna
+    
+  "{company}": |
+    W kontekście jest tekst z wstępnie wygenerowanymi danymi przez Faker.
+    Wygeneruj nazwę polskiej firmy w poprawnym przypadku gramatycznym.
+    Jeśli w tekście są pozostałości typu [company] - podmień je.
+    Tylko nazwa firmy, bez dodatkowych słów.
+    Przykład: Przedsiębiorstwo Handlowe Sp. z o.o.
+    
+  "{date}": |
+    W kontekście jest tekst z wstępnie wygenerowanymi danymi przez Faker.
+    Wygeneruj datę w formacie polskim (DD.MM.YYYY lub DD MM YYYY).
+    Jeśli w tekście są pozostałości typu [date] - podmień je.
+    Tylko data, bez dodatkowych słów.
+    Przykład: 15.03.2024
+    
+  "{bank-account}": |
+    W kontekście jest tekst z wstępnie wygenerowanymi danymi przez Faker.
+    Wygeneruj numer konta bankowego w formacie polskim (26 cyfr).
+    Jeśli w tekście są pozostałości typu [bank-account] - podmień je.
+    Tylko numer, bez spacji, bez myślników.
+    Przykład: 12345678901234567890123456
+
+# Default prompt for unknown entity types
+default_prompt: |
+  Wygeneruj polskie dane typu {entity_type}.
+  Tylko dane, bez dodatkowych słów, bez cudzysłowów.
+
