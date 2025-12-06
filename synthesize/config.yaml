@@ -2,13 +2,22 @@
 
 # Model LLM
 llm:
+  # Tryb: "local" (Ollama) lub "online" (PLLuM API)
+  mode: "local"  # lub "online"
+  
   # Domyślny model (Ollama local)
   model: "ollama/PRIHLOP/PLLuM:latest"
   
-  # Alternatywne modele:
+  # Alternatywne modele local:
   # model: "ollama/gemma3:12b"
   # model: "ollama/llama3.1:latest"
-  # model: "openai/gpt-4"  # wymaga OPENAI_API_KEY
+  
+  # Konfiguracja modelu online (PLLuM API)
+  # Wymaga zmiennej środowiskowej PLLUM_API_KEY
+  online:
+    base_url: "https://apim-pllum-tst-pcn.azure-api.net/vllm/v1"
+    model_name: "CYFRAGOVPL/pllum-12b-nc-chat-250715"
+    # api_key: pobierane z PLLUM_API_KEY env var
 
 # Faker
 faker:

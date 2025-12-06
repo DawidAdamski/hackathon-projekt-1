@@ -52,3 +52,5 @@ output/
 .env
 .env.local
 
+# Uwaga: env.example jest w repo jako template
+

@@ -19,6 +19,7 @@ Usage:
     uv run python main.py serve --port 8000
 """
 
+import os
 import random
 from pathlib import Path
 from typing import Optional
@@ -27,6 +28,13 @@ import typer
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
+
+# Wczytaj .env jeśli istnieje
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # python-dotenv nie jest wymagane, ale zalecane
 
 from src.core import synthesize_line, process_file, synthesize_batch
 from src.llm_client import init_llm, is_initialized
@@ -45,12 +53,16 @@ console = Console()
 DEFAULT_INPUT = "../nask_train/orig.txt"
 DEFAULT_MODEL = "ollama/PRIHLOP/PLLuM:latest"
 
+# Sprawdź czy używać modelu online (z env)
+USE_ONLINE = os.getenv("USE_ONLINE", "false").lower() == "true"
+
 
 @app.command()
 def process(
     input_file: str = typer.Argument(DEFAULT_INPUT, help="Plik wejściowy z tokenami"),
     output: Optional[str] = typer.Option(None, "-o", "--output", help="Plik wyjściowy"),
-    model: str = typer.Option(DEFAULT_MODEL, "-m", "--model", help="Model LLM"),
+    model: str = typer.Option(DEFAULT_MODEL, "-m", "--model", help="Model LLM (dla trybu local)"),
+    online: bool = typer.Option(False, "--online", help="Użyj modelu online (PLLuM API)"),
     no_llm: bool = typer.Option(False, "--no-llm", help="Tylko Faker (bez LLM)"),
     no_jsonl: bool = typer.Option(False, "--no-jsonl", help="Nie generuj pliku .jsonl"),
     prompt_mode: bool = typer.Option(False, "--prompt-mode", help="Użyj pełnych promptów"),
@@ -72,7 +84,16 @@ def process(
     
     console.print(f"[blue]📂 Input:[/blue] {input_path}")
     console.print(f"[blue]📂 Output:[/blue] {output_path}")
-    console.print(f"[blue]🤖 Model:[/blue] {model if not no_llm else 'DISABLED'}")
+    
+    # Określ tryb LLM
+    use_online_mode = online or USE_ONLINE
+    if not no_llm:
+        if use_online_mode:
+            console.print(f"[blue]🤖 Mode:[/blue] ONLINE (PLLuM API)")
+        else:
+            console.print(f"[blue]🤖 Mode:[/blue] LOCAL ({model})")
+    else:
+        console.print(f"[blue]🤖 Model:[/blue] DISABLED")
     console.print()
     
     # Przetwórz
@@ -83,6 +104,7 @@ def process(
         generate_jsonl=not no_jsonl,
         use_prompt_mode=prompt_mode,
         llm_model=model,
+        use_online=use_online_mode,
     )
     
     console.print(f"\n[green]✅ Zakończono pomyślnie![/green]")
@@ -94,7 +116,8 @@ def test(
     line: Optional[int] = typer.Option(None, "-l", "--line", help="Numer linii do testowania"),
     random_line: bool = typer.Option(False, "-r", "--random", help="Losowa linijka"),
     random_n: Optional[int] = typer.Option(None, "-n", "--random-n", help="N losowych linijek"),
-    model: str = typer.Option(DEFAULT_MODEL, "-m", "--model", help="Model LLM"),
+    model: str = typer.Option(DEFAULT_MODEL, "-m", "--model", help="Model LLM (dla trybu local)"),
+    online: bool = typer.Option(False, "--online", help="Użyj modelu online (PLLuM API)"),
     no_llm: bool = typer.Option(False, "--no-llm", help="Tylko Faker (bez LLM)"),
     prompt_mode: bool = typer.Option(False, "--prompt-mode", help="Użyj pełnych promptów"),
 ):
@@ -118,7 +141,11 @@ def test(
     # Inicjalizuj LLM jeśli potrzebny
     if not no_llm:
         if not is_initialized():
-            init_llm(model)
+            use_online_mode = online or USE_ONLINE
+            if use_online_mode:
+                init_llm(use_online=True)
+            else:
+                init_llm(model=model, use_online=False)
     
     # Wybierz linijki do testowania
     if line is not None:
@@ -182,7 +209,8 @@ def test(
 def serve(
     host: str = typer.Option("0.0.0.0", "--host", help="Host"),
     port: int = typer.Option(8000, "-p", "--port", help="Port"),
-    model: str = typer.Option(DEFAULT_MODEL, "-m", "--model", help="Model LLM"),
+    model: str = typer.Option(DEFAULT_MODEL, "-m", "--model", help="Model LLM (dla trybu local)"),
+    online: bool = typer.Option(False, "--online", help="Użyj modelu online (PLLuM API)"),
 ):
     """
     Uruchom REST API server.
@@ -192,7 +220,11 @@ def serve(
     from pydantic import BaseModel
     
     # Inicjalizuj LLM
-    init_llm(model)
+    use_online_mode = online or USE_ONLINE
+    if use_online_mode:
+        init_llm(use_online=True)
+    else:
+        init_llm(model=model, use_online=False)
     
     # FastAPI app
     api = FastAPI(

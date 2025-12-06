@@ -110,6 +110,7 @@ def process_file(
     generate_jsonl: bool = True,
     use_prompt_mode: bool = False,
     llm_model: Optional[str] = None,
+    use_online: bool = False,
 ) -> dict:
     """
     Przetwórz cały plik linia po linii.
@@ -137,8 +138,11 @@ def process_file(
     
     # Inicjalizuj LLM jeśli potrzebny
     if use_llm and not is_initialized():
-        model = llm_model or "ollama/PRIHLOP/PLLuM:latest"
-        init_llm(model)
+        if use_online:
+            init_llm(use_online=True)
+        else:
+            model = llm_model or "ollama/PRIHLOP/PLLuM:latest"
+            init_llm(model=model, use_online=False)
     
     # Wczytaj linie
     print(f"📂 Reading: {input_path}")

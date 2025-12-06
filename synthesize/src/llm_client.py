@@ -4,8 +4,12 @@ LLM Client - prosty wrapper DSPy (wzorzec z TestDspy).
 Konfiguracja jest maksymalnie prosta:
     lm = dspy.LM(model="ollama/PRIHLOP/PLLuM:latest")
     dspy.configure(lm=lm)
+    
+Dla modelu online:
+    init_llm(use_online=True)  # używa zmiennych środowiskowych
 """
 
+import os
 import dspy
 from typing import Optional
 from .prompts import (
@@ -19,21 +23,72 @@ from .prompts import (
 _lm: Optional[dspy.LM] = None
 
 
-def init_llm(model: str = "ollama/PRIHLOP/PLLuM:latest") -> dspy.LM:
+def init_llm(
+    model: Optional[str] = None,
+    use_online: bool = False,
+    api_key: Optional[str] = None,
+    base_url: Optional[str] = None,
+    model_name: Optional[str] = None,
+) -> dspy.LM:
     """
     Inicjalizacja LLM - prosta konfiguracja jak w TestDspy.
     
     Args:
-        model: Nazwa modelu w formacie "ollama/nazwa" lub "openai/nazwa"
+        model: Nazwa modelu (dla trybu local, np. "ollama/PRIHLOP/PLLuM:latest")
+        use_online: Jeśli True, używa modelu online zamiast lokalnego Ollama
+        api_key: API key dla modelu online (jeśli None, pobiera z PLLUM_API_KEY)
+        base_url: Base URL dla API (jeśli None, używa domyślnego)
+        model_name: Nazwa modelu online (jeśli None, używa domyślnego)
     
     Returns:
         Skonfigurowany model DSPy
     """
     global _lm
-    _lm = dspy.LM(model=model)
-    dspy.configure(lm=_lm)
-    print(f"✓ LLM initialized: {model}")
-    return _lm
+    
+    if use_online:
+        # Tryb online - PLLuM API
+        api_key = api_key or os.getenv("PLLUM_API_KEY")
+        base_url = base_url or os.getenv(
+            "PLLUM_BASE_URL",
+            "https://apim-pllum-tst-pcn.azure-api.net/vllm/v1"
+        )
+        model_name = model_name or os.getenv(
+            "PLLUM_MODEL_NAME",
+            "CYFRAGOVPL/pllum-12b-nc-chat-250715"
+        )
+        
+        if not api_key:
+            raise ValueError(
+                "PLLUM_API_KEY not set. Set it as environment variable or pass as api_key parameter."
+            )
+        
+        # Ustaw nagłówek dla LiteLLM (PLLuM API wymaga Ocp-Apim-Subscription-Key)
+        try:
+            import litellm
+            litellm.headers = {"Ocp-Apim-Subscription-Key": api_key}
+        except ImportError:
+            pass  # litellm może nie być dostępne, ale DSPy powinno działać
+        
+        # Utwórz model OpenAI-compatible
+        openai_model = f"openai/{model_name}" if not model_name.startswith("openai/") else model_name
+        
+        _lm = dspy.LM(
+            model=openai_model,
+            api_key=api_key,
+            api_base=base_url,
+        )
+        
+        dspy.configure(lm=_lm)
+        print(f"✓ LLM initialized (online): {model_name}")
+        print(f"  API: {base_url}")
+        return _lm
+    else:
+        # Tryb local - Ollama
+        model = model or "ollama/PRIHLOP/PLLuM:latest"
+        _lm = dspy.LM(model=model)
+        dspy.configure(lm=_lm)
+        print(f"✓ LLM initialized (local): {model}")
+        return _lm
 
 
 def get_lm() -> Optional[dspy.LM]:
@@ -229,10 +284,48 @@ def correct_morphology(text: str) -> str:
         
         cleaned = _clean_response(corrected_text)
         
+        # ZABEZPIECZENIE 0: Sprawdź czy LLM zwrócił analizę morfologiczną zamiast tekstu
+        # Przykład: {'text': [{'form': '...', 'comment': '...'}]}
+        if cleaned.strip().startswith("{'text':") or cleaned.strip().startswith('{"text":'):
+            # Sprawdź czy to lista z 'form' i 'comment' - to jest analiza morfologiczna, nie tekst!
+            import re
+            if re.search(r"'form'|'comment'|\"comment\"", cleaned):
+                print(f"⚠️ LLM returned morphological analysis instead of text. Using original.")
+                return text
+        
         # OPTYMALIZACJA: Sprawdź czy LLM zwrócił klucz "TEKST_JEST_TAKI_SAM"
         if cleaned.strip().upper() == "TEKST_JEST_TAKI_SAM":
             # Tekst nie wymaga zmian - zwróć oryginalny
             return text
+        
+        # ZABEZPIECZENIE 1: Sprawdź czy tekst nie został przepisany na inny język
+        # Jeśli tekst zawiera dużo angielskich słów, prawdopodobnie LLM zmienił język
+        import re
+        english_words = re.findall(r'\b(the|and|or|but|in|on|at|to|for|of|with|by|a|an|is|are|was|were|be|been|being|have|has|had|do|does|did|will|would|could|should|may|might|must|can|says|say|said|here|help|let|go|over|your|situation|step|mentioned|that|you|live|phone|number|email|great|know|this|information|now|discuss|job|warehouse|seems|like|boss|constantly|nagging|mother|bothered|small|things|home|definitely|frustrating|stressful|however|try|remember|these|are|normal|challenges|life|most|people|through|them|as|for|sleep|problems|perfectly|fine|feel|concerned|instead|diagnosing|yourself|depression|why|not|schedule|appointment|doctor|therapist|they|can|provide|professional|advice|support|meantime|develop|healthy|habits|regular|exercise|meditation|consistent|bedtime|routine|reduce|stress|improve|quality|finally|don|afraid|ask|when|need|it|there|many|resources|available|including|online|support|groups|hotlines|hang|there|other|questions|concerns)\b', cleaned.lower())
+        if len(english_words) > 5:  # Jeśli jest więcej niż 5 angielskich słów, prawdopodobnie to błąd
+            print(f"⚠️ LLM changed language to English (detected {len(english_words)} English words). Using original text.")
+            return text
+        
+        # ZABEZPIECZENIE 2: Sprawdź czy tekst nie został drastycznie zmieniony
+        # Jeśli długość różni się o więcej niż 50%, prawdopodobnie LLM dodał komentarze/analizy
+        if len(text) > 100:  # Tylko dla dłuższych tekstów
+            length_diff = abs(len(cleaned) - len(text)) / len(text)
+            if length_diff > 0.5:  # Różnica większa niż 50%
+                print(f"⚠️ LLM response length differs significantly ({len(cleaned)} vs {len(text)}, diff: {length_diff:.1%}). Using original.")
+                return text
+        
+        # ZABEZPIECZENIE 3: Sprawdź czy tekst zaczyna się od angielskich fraz (np. "A woman's voice says:")
+        english_prefixes = [
+            r'^A\s+\w+\'?s?\s+voice\s+says?:',
+            r'^Here\s+is\s+the',
+            r'^Let\s+me\s+',
+            r'^I\s+can\s+see',
+            r'^Great\s+to\s+know',
+        ]
+        for pattern in english_prefixes:
+            if re.search(pattern, cleaned, re.IGNORECASE):
+                print(f"⚠️ LLM added English commentary. Using original text.")
+                return text
         
         # Fallback: jeśli wyczyszczony tekst jest znacznie krótszy niż oryginalny (podejrzane obcięcie)
         # Ale tylko jeśli oryginalny tekst był dłuższy niż 50 znaków (żeby nie blokować krótkich odpowiedzi)
@@ -274,14 +367,31 @@ def _clean_response(response: str) -> str:
     try:
         if text.strip().startswith('{') or text.strip().startswith('['):
             json_data = json.loads(text)
+            
+            # ZABEZPIECZENIE: Sprawdź czy to analiza morfologiczna (np. {'text': [{'form': '...', 'comment': '...'}]})
+            if isinstance(json_data, dict) and 'text' in json_data:
+                if isinstance(json_data['text'], list) and len(json_data['text']) > 0:
+                    if isinstance(json_data['text'][0], dict) and ('form' in json_data['text'][0] or 'comment' in json_data['text'][0]):
+                        # To jest analiza morfologiczna - zwróć pusty string, żeby funkcja wywołująca mogła użyć oryginalnego tekstu
+                        return ""
+            
             # Szukaj wartości w różnych możliwych kluczach
             for key in ['filled', '-filled', 'corrected', '-corrected', 'text', 'output', 'result']:
                 if key in json_data:
-                    text = str(json_data[key])
+                    extracted = json_data[key]
+                    # Sprawdź czy to nie jest lista z analizą morfologiczną
+                    if isinstance(extracted, list) and len(extracted) > 0:
+                        if isinstance(extracted[0], dict) and ('form' in extracted[0] or 'comment' in extracted[0]):
+                            # To jest analiza morfologiczna
+                            return ""
+                    text = str(extracted)
                     break
             # Jeśli to lista, weź pierwszy element
             if isinstance(json_data, list) and len(json_data) > 0:
                 if isinstance(json_data[0], dict):
+                    # Sprawdź czy to nie jest analiza morfologiczna
+                    if 'form' in json_data[0] or 'comment' in json_data[0]:
+                        return ""
                     for key in ['text', 'content', 'output', 'filled', 'corrected']:
                         if key in json_data[0]:
                             text = str(json_data[0][key])
@@ -396,6 +506,8 @@ def _clean_response(response: str) -> str:
         r'^Odpowiedź[:\s]+',
         r'^Explanation[:\s]+',
         r'^Wyjaśnienie[:\s]+',
+        r'^<[^>]*Output[^>]*>',  # < Output for the first text >
+        r'^<[^>]*output[^>]*>',  # < output for... >
     ]
     
     for pattern in safe_prefixes:
@@ -424,6 +536,20 @@ def _clean_response(response: str) -> str:
     # 8. Usuń sufixy typu "Explanation: ..." na końcu (całe zdanie po "Explanation:")
     text = re.sub(r'\s*Explanation\s*:.*$', '', text, flags=re.IGNORECASE | re.MULTILINE | re.DOTALL)
     text = re.sub(r'\s*Wyjaśnienie\s*:.*$', '', text, flags=re.IGNORECASE | re.MULTILINE | re.DOTALL)
+    
+    # 8a. Usuń komentarze w nawiasach trójkątnych (np. < Output for the first text >)
+    text = re.sub(r'\s*<[^>]*Output[^>]*>\s*', ' ', text, flags=re.IGNORECASE)
+    text = re.sub(r'\s*<[^>]*output[^>]*>\s*', ' ', text, flags=re.IGNORECASE)
+    # Usuń również na początku i końcu
+    text = re.sub(r'^<[^>]*Output[^>]*>\s*', '', text, flags=re.IGNORECASE | re.MULTILINE)
+    text = re.sub(r'\s*<[^>]*Output[^>]*>$', '', text, flags=re.IGNORECASE | re.MULTILINE)
+    text = re.sub(r'^<[^>]*output[^>]*>\s*', '', text, flags=re.IGNORECASE | re.MULTILINE)
+    text = re.sub(r'\s*<[^>]*output[^>]*>$', '', text, flags=re.IGNORECASE | re.MULTILINE)
+    
+    # 8b. Usuń komentarze w nawiasach (np. "(nie ma takiego słowa jak \"PARku\")")
+    # Ale tylko jeśli są na początku lub końcu linii, nie w środku tekstu
+    text = re.sub(r'^\s*\([^)]*nie\s+ma[^)]*\)\s*', '', text, flags=re.IGNORECASE | re.MULTILINE)
+    text = re.sub(r'\s*\([^)]*nie\s+ma[^)]*\)\s*$', '', text, flags=re.IGNORECASE | re.MULTILINE)
     
     # 9. Usuń markdown code blocks (``` na początku i końcu)
     text = re.sub(r'^```[a-z]*\s*', '', text, flags=re.MULTILINE)  # Usuń ``` na początku

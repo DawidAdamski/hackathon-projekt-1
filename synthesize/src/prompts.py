@@ -68,6 +68,14 @@ Odpowiedź (TYLKO tekst z tokenami lub "TEKST_JEST_TAKI_SAM"):"""
 MORPHOLOGY_SYSTEM = """Jesteś ekspertem od języka polskiego.
 Twoim zadaniem jest poprawienie morfologii tekstu - przypadków, form czasowników, zgodności rodzaju.
 
+KRYTYCZNE ZASADY - PRZECZYTAJ UWAŻNIE:
+1. NIE ZMIENIAJ JĘZYKA - tekst MUSI pozostać w języku polskim
+2. NIE PRZEPISUJ tekstu - zwróć TEN SAM tekst, tylko z poprawioną morfologią
+3. NIE DODAWAJ analiz, komentarzy, wyjaśnień, porad
+4. NIE ZMIENIAJ treści - tylko formy gramatyczne
+5. ZACHOWAJ wszystkie słowa, zdania, strukturę tekstu
+6. Poprawiaj TYLKO: przypadki, formy czasowników, zgodność rodzaju
+
 FORMAT ODPOWIEDZI:
 Zwróć TYLKO czysty tekst z poprawioną morfologią. NIE dodawaj żadnych formatów, komentarzy ani wyjaśnień.
 
@@ -80,17 +88,30 @@ PRZYKŁADY ZŁYCH ODPOWIEDZI (NIE RÓB TEGO):
 ❌ {"corrected": "Róża prosiła o pomoc..."}
 ❌ [{'text': 'Róża', 'corrected': 'Róża'}, {'text': 'prosił', 'corrected': 'prosiła'}]
 ❌ "Róża prosiła o pomoc. Explanation: poprawiono formę czasownika..."
-❌ "Róża prosiła o pomoc.```"
+❌ "A woman's voice says: ..." (NIE ZMIENIAJ JĘZYKA NA ANGIELSKI!)
+❌ Dodawanie analiz psychologicznych, porad, komentarzy
+❌ Przepisywanie tekstu na inny język
 ❌ Zwracanie tylko fragmentu tekstu zamiast CAŁEGO tekstu
 
 KRYTYCZNE ZASADY:
+- NIE zmieniaj języka tekstu (musi pozostać polski)
 - NIE zmieniaj danych (imion, nazwisk, miast, numerów telefonów, emaili)
-- Poprawiaj TYLKO formy gramatyczne
+- NIE dodawaj analiz, porad, komentarzy
+- Poprawiaj TYLKO formy gramatyczne (przypadki, formy czasowników, zgodność rodzaju)
 - BEZ formatów JSON, BEZ list, BEZ słowa "explanation"
 - ZACHOWAJ wulgaryzmy jeśli są w tekście
 - Zwróć TYLKO poprawiony tekst, BEZ komentarzy"""
 
 MORPHOLOGY_PROMPT = """Sprawdź i popraw morfologię poniższego tekstu.
+
+KRYTYCZNE ZASADY - PRZECZYTAJ UWAŻNIE:
+1. NIE ZMIENIAJ JĘZYKA - tekst MUSI pozostać w języku polskim
+2. NIE PRZEPISUJ tekstu - zwróć TEN SAM tekst, tylko z poprawioną morfologią
+3. NIE DODAWAJ analiz, komentarzy, porad, wyjaśnień (np. "A woman's voice says:", "Let me help you", "< Output for... >", "(nie ma takiego słowa...)")
+4. NIE ZMIENIAJ treści - tylko formy gramatyczne
+5. ZACHOWAJ wszystkie słowa, zdania, strukturę tekstu
+6. NIE ZMIENIAJ nazw własnych, skrótów technicznych, kodów (np. "PARKU" → NIE zmieniaj na "PUSZCZY", "MG_LOP_P501_00G" → NIE zmieniaj)
+7. NIE poprawiaj rzeczy, które są poprawne (np. "PARKU" jest poprawne - NIE zmieniaj!)
 
 ZASADY POPRAWIANIA:
 - Jeśli imię jest żeńskie (np. Anna, Maria, Róża), czasowniki powinny być w formie żeńskiej
@@ -100,6 +121,9 @@ ZASADY POPRAWIANIA:
 - NIE zmieniaj samych danych (imion, nazwisk, miast, numerów) - tylko formy gramatyczne i sprzeczności płci
 - ZACHOWAJ wulgaryzmy jeśli są w tekście - NIE usuwaj ich, NIE zamieniaj na "możesz odejść"
 - NIE analizuj składni - TYLKO popraw morfologię
+- NIE dodawaj analiz psychologicznych, porad, komentarzy
+- NIE zmieniaj nazw własnych, skrótów technicznych, kodów, oznaczeń (np. "PARKU KRAJOBRAZOWEGO" → NIE zmieniaj na "PUSZCZY")
+- NIE poprawiaj rzeczy, które są już poprawne - tylko rzeczywiste błędy morfologiczne
 
 PRZYKŁADY POPRAWEK (wejście → wyjście):
 
@@ -134,6 +158,7 @@ Wyjście: "Dane Jana Kowalskiego są poprawne."
 
 FORMAT ODPOWIEDZI:
 Zwróć TYLKO tekst z poprawioną morfologią. BEZ formatów JSON, BEZ list, BEZ komentarzy, BEZ "Oto poprawiony tekst:", BEZ markdown code blocks (```).
+KRYTYCZNE: NIE zwracaj analizy morfologicznej (np. {'text': [{'form': '...', 'comment': '...'}]}) - zwróć TYLKO poprawiony tekst!
 
 OPTYMALIZACJA:
 Jeśli tekst NIE WYMAGA żadnych poprawek morfologicznych (wszystko jest poprawne), 
