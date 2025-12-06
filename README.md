@@ -1,100 +1,205 @@
-Nazwa Projektu: Dane bez twarzy
+# 🚀 Dane Bez Twarzy
 
-Organizator: Fundacja Tech for Society
+> **Projekt hackathonowy:** Automatyczna anonimizacja danych osobowych (PII) w dokumentach tekstowych
 
-1. Problem do rozwiązania (The "Why")
-Opis problemu: W dobie RODO, ręczna anonimizacja dokumentów jest procesem czasochłonnym, kosztownym i podatnym na błędy. Organizacje (firmy, instytucje publiczne, ośrodki badawcze) potrzebują narzędzia do automatycznego usuwania danych osobowych (PII) z dokumentów tekstowych, aby móc je bezpiecznie przetwarzać i udostępniać do analizy.
+---
 
-Grupa docelowa: Głównymi beneficjentami są użytkownicy nietechniczni, tacy jak prawnicy, analitycy biznesowi, pracownicy administracji publicznej oraz badacze, którzy muszą pracować na zanonimizowanych danych.
+## 📚 Dokumentacja projektu
 
-2. Proponowane rozwiązanie (The "What")
-Główny cel: Stworzenie szybkiego, dokładnego i łatwego w użyciu narzędzia, które automatycznie identyfikuje i anonimizuje dane osobowe w dokumentach tekstowych w języku polskim.
+- **[Product Requirements Document (PRD)](README.PRD.md)** – Problem, rozwiązanie, wymagania i wyzwania
+- **[Minimum Viable Product (MVP)](README.MVP.md)** – Analiza MVP, zakres, kryteria sukcesu i stack technologiczny
 
-Kluczowe funkcjonalności (zgodnie z PDF):
+---
 
-Interfejs do wgrywania plików (.txt, .docx) lub wklejania tekstu.
+## 🧩 Stack technologiczny
 
-Mechanizm identyfikacji PII (imiona, nazwiska, PESEL, numery telefonów, e-maile, adresy, NIP).
+- **FastAPI** – backend + prosty frontend (Jinja2)
+- **PostgreSQL** – baza jobów
+- **Celery** – system tasków (fast / slow / fail)
+- **RabbitMQ** – broker komunikacji
+- **Celery Beat** – periodyczne taski
+- **Alembic** – migracje bazy
+- **pgAdmin4** – GUI do zarządzania SQL
+- **Docker Compose** – cały system odpalany jednym poleceniem
+- **pytest** – testy jednostkowe / API
 
-Możliwość zastąpienia wykrytych danych zdefiniowanymi placeholderami (np. [IMIĘ], [PESEL]).
+---
 
-Wyświetlenie zanonimizowanego tekstu i opcja jego pobrania.
+## 🏗️ Struktura projektu
 
-3. Oczekiwany rezultat (Deliverable)
-Forma projektu: Działający prototyp aplikacji, np. webowej.
+```
+backend/
+app/
+routes/
+models/
+schemas/
+services/
+tasks/
+templates/
+core/
+db/
+main.py
+entrypoints/
+api.sh
+worker.sh
+beat.sh
+alembic/
+versions/
+docker-compose.yml
+.env.example
+Makefile
+```
 
-Kryteria oceny:
+---
 
-Skuteczność i dokładność anonimizacji (kryterium kluczowe).
+## 🔧 Instalacja i uruchomienie
 
-Innowacyjność podejścia (wykorzystanie modeli ML/AI).
+### 1. Utwórz plik `.env`:
 
-Jakość działającego prototypu i UX (User Experience).
+```bash
+cp .env.example .env
+```
 
-Wykonalność i potencjał do dalszego rozwoju.
+Możesz tam zmienić hasła, porty oraz dane logowania do pgAdmin.
 
-4. Potencjalne wyzwania i ryzyka
-Dokładność NER dla języka polskiego: Gotowe modele NER mogą mieć trudności z precyzyjnym rozpoznawaniem wszystkich typów PII, zwłaszcza niestandardowych adresów. Poleganie wyłącznie na nich może prowadzić do przeoczeń lub fałszywych alarmów.
+### 2. Uruchom system:
 
-Obsługa formatu .docx: Parsowanie plików .docx z zachowaniem oryginalnego formatowania po anonimizacji jest złożone. Prosta ekstrakcja tekstu jest łatwa, ale odtworzenie struktury dokumentu w ramach hackathonu jest dużym wyzwaniem.
+```bash
+docker compose up -d --build
+```
 
-Wydajność: Przetwarzanie dużych dokumentów za pomocą zaawansowanych modeli AI (np. z biblioteki transformers) może być wolne i wymagać znacznych zasobów obliczeniowych, co negatywnie wpłynie na doświadczenie użytkownika w aplikacji webowej.
+### 3. Uruchom migracje:
 
-Analiza MVP (Minimum Viable Product)
-5. Definicja Produktu
-Zwięzły opis produktu (The "Elevator Pitch"): Budujemy prostą aplikację webową, która pozwala użytkownikowi wkleić tekst w języku polskim i natychmiast otrzymać jego wersję z automatycznie usuniętymi kluczowymi danymi osobowymi (imiona, nazwiska, PESEL).
+```bash
+make migrate
+```
 
-Kluczowy problem (Core Pain Point): Umożliwienie błyskawicznej i łatwej anonimizacji fragmentów tekstu bez potrzeby manualnej, żmudnej pracy i specjalistycznej wiedzy.
+---
 
-6. Zakres MVP
-Najkrótsza ścieżka do wartości (Kluczowe funkcjonalności MVP):
+## 🌐 Dostępne usługi
 
-Prosty interfejs webowy z jednym polem do wklejenia tekstu.
+| Usługa        | Adres                                                    | Opis               |
+| ------------- | -------------------------------------------------------- | ------------------ |
+| FastAPI       | [http://localhost:8000](http://localhost:8000)           | Panel + API        |
+| Swagger       | [http://localhost:8000/docs](http://localhost:8000/docs) | API docs           |
+| pgAdmin       | [http://localhost:5050](http://localhost:5050)           | GUI do Postgresa   |
+| RabbitMQ Mgmt | [http://localhost:15672](http://localhost:15672)         | Monitoring kolejki |
 
-Backendowy mechanizm anonimizacji, który identyfikuje i zastępuje tylko imiona, nazwiska, numery PESEL i adresy e-mail.
+---
 
-Wyświetlenie zanonimizowanego tekstu w drugim polu tekstowym na tej samej stronie.
+## 🎛️ Panel WWW
 
-Ścieżki użytkownika (User Stories dla MVP):
+Prosty interfejs HTML pod `/`:
 
-Jako prawnik, chcę wkleić fragment umowy do aplikacji i natychmiast otrzymać tekst z zanonimizowanymi nazwiskami i numerami PESEL, aby móc go bezpiecznie przesłać dalej.
+- Uruchamianie tasków:
+  - **Fast** – natychmiastowy
+  - **Slow** – 10 sekund
+  - **Fail** – zawsze error
 
-Jako pracownik HR, chcę wkleić treść CV i otrzymać wersję bez danych kontaktowych (e-mail), aby udostępnić ją wewnątrz firmy zgodnie z zasadami.
+- Lista jobów + statusy aktualizowane przez worker
 
-Poza zakresem MVP (Out of Scope):
+---
 
-Obsługa wgrywania/pobierania plików (np. .txt, .docx).
+## 🔁 Celery Workers & Beat
 
-Identyfikacja złożonych PII, takich jak adresy zamieszkania czy numery NIP.
+W systemie działają:
 
-Możliwość konfiguracji placeholderów przez użytkownika.
+### Worker
 
-System logowania czy historia przetwarzanych dokumentów.
+Obsługuje kolejki:
 
-7. Kryteria Sukcesu MVP
-Metryki sukcesu:
+```
+fast, slow, fail, celery
+```
 
-Aplikacja zwraca wynik dla tekstu o długości 5000 znaków w czasie poniżej 10 sekund.
+### Beat
 
-Skuteczność (F1-score) w wykrywaniu imion, nazwisk i numerów PESEL na przygotowanym zestawie testowym jest wyższa niż 85%.
+Generuje zadania periodyczne, np. co X sekund:
 
-Prototyp jest w stanie obsłużyć co najmniej 5 jednoczesnych zapytań bez awarii.
+- tworzy rekord Job w bazie
+- odpala właściwy Celery task
 
-Realizacja Techniczna
-8. Sugerowany stack technologiczny (Python)
-Backend/API: FastAPI – ze względu na wysoką wydajność, prostotę użycia i automatycznie generowaną dokumentację, co jest kluczowe w warunkach hackathonu.
+Solidne do testowania plug&play tasków na hackathon.
 
-Analiza danych/AI:
+---
 
-spaCy z modelem dla języka polskiego (pl_core_news_lg) do podstawowego NER (identyfikacja osób).
+## 🐘 pgAdmin
 
-Wyrażenia regularne (moduł re) do niezawodnego wykrywania wzorców o stałej strukturze, takich jak PESEL, NIP, adresy e-mail i numery telefonów.
+Login domyślny z `.env.example`:
 
-Interfejs użytkownika (jeśli dotyczy): Streamlit – pozwala na błyskawiczne stworzenie interaktywnego interfejsu webowego bezpośrednio w Pythonie, bez konieczności pisania kodu HTML/CSS/JS. Jest idealny do szybkiego prototypowania.
+- email: `admin@admin.com`
+- hasło: `admin`
 
-Inne (np. bazy danych, scraping): Brak – dla zdefiniowanego MVP żadne dodatkowe narzędzia nie są potrzebne.
+Po zalogowaniu dodaj nowy serwer:
 
-9. Ocena Wykonalności (Feasibility)
-Możliwość wykonania w 48h: Wysoka
+- Host: `db`
+- Port: `5432`
+- User: `${POSTGRES_USER}`
+- Password: `${POSTGRES_PASSWORD}`
 
-Uzasadnienie: Zakres MVP jest celowo wąski i skupia się na kluczowych funkcjonalnościach. Wykorzystanie bibliotek takich jak Streamlit (dla UI) oraz połączenie spaCy z wyrażeniami regularnymi (dla logiki) drastycznie skraca czas dewelopmentu. Największe ryzyko – niska dokładność modelu NER – jest łagodzone przez użycie regexów dla danych o przewidywalnej strukturze. Rezygnacja z obsługi plików na rzecz wklejanego tekstu eliminuje złożoność związaną z parsowaniem.
+---
+
+## 🔨 Migracje Alembica
+
+Wykonanie migracji:
+
+```bash
+make migrate
+```
+
+Utworzenie nowej migracji:
+
+```bash
+make makemigration m="twoj opis"
+```
+
+Reset bazy (DEV):
+
+```bash
+make reset-db
+```
+
+---
+
+## 🧪 Testy
+
+Testy używają **SQLite in-memory**, więc są szybkie i nie wymagają Dockera.
+
+Uruchom testy:
+
+```bash
+cd backend
+pytest -q
+```
+
+Fixtures (`conftest.py`) zapewniają:
+
+- izolowaną testową bazę
+- override FastAPI `get_db`
+- testowego klienta HTTP
+
+---
+
+## 🛠️ Implementacja tasków
+
+Taski znajdują się w:
+
+```
+backend/app/tasks/
+```
+
+Dostępne:
+
+- `fast_task.py`
+- `slow_task.py`
+- `fail_task.py`
+- `periodic_tasks.py` (dla Celery Beat)
+
+Twój zespół może łatwo dopisywać własne taski modułami.
+
+---
+
+## 🧹 Dodatkowe narzędzia
+
+- **Makefile** – skróty do zarządzania projektem
+- **.gitignore** – gotowy pod Pythona + Dockera + pgAdmin + testy
