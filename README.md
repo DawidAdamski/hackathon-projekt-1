@@ -1,4 +1,4 @@
-# 🚀 Hacknation Job Orchestrator
+# 🚀 Dane Bez Twarzy
 
 ## 🧩 Stack technologiczny
 
@@ -192,3 +192,4 @@ Twój zespół może łatwo dopisywać własne taski modułami.
 
 - **Makefile** – skróty do zarządzania projektem
 - **.gitignore** – gotowy pod Pythona + Dockera + pgAdmin + testy
+
