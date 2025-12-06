@@ -3,6 +3,7 @@ from presidio_analyzer import AnalyzerEngine
 from presidio_analyzer.nlp_engine import NlpEngineProvider
 import logging
 
+
 class SpacyAnonymizer:
     def __init__(self, log, analyzers_lock, analyzers):
         self.log = log
