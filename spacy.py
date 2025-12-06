@@ -2,16 +2,16 @@ from typing import Literal
 from presidio_analyzer import AnalyzerEngine
 from presidio_analyzer.nlp_engine import NlpEngineProvider
 import logging
+import os
 
 
 class SpacyAnonymizer:
     def __init__(self, log, analyzers_lock, analyzers):
-        self.log = log
+        self.log = self.default_logger if log is None else log
         self.analyzers_lock = analyzers_lock
         self.analyzers = analyzers
 
-    @staticmethod
-    def default_logger():
+    def default_logger(self):
         log = logging.getLogger('default_logger - console only')
         if len(log.handlers) == 0:
             log.setLevel(logging.DEBUG)
@@ -40,7 +40,7 @@ class SpacyAnonymizer:
                 model_path = spacy_models[supported_language]
                 if not os.path.exists(model_path):
                     raise ValueError(f"Model for language `{language}` not found in `{model_path}`")
-                self.log.info(f'Loading analyzer for language `{language}`')
+                self.log.debug(f'Loading analyzer for language `{language}`')
                 nlp_conf = {"nlp_engine_name": "spacy", "models": [{"lang_code": language, "model_name": model_path}]}
                 provider = NlpEngineProvider(nlp_configuration=nlp_conf)
                 nlp_engine = provider.create_engine()
