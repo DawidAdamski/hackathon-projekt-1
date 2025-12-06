@@ -1,0 +1,84 @@
+# -------------------------
+# Python
+# -------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.pkl
+*.swp
+*.swo
+
+# Virtualenv
+.env/
+.venv/
+venv/
+ENV/
+env.bak/
+env/
+
+# Poetry / pip stuff
+poetry.lock
+pip-wheel-metadata/
+
+# Byte-compiled
+*.pyc
+
+# -------------------------
+# FastAPI / Backend
+# -------------------------
+backend/.mypy_cache/
+backend/.pytest_cache/
+backend/.ruff_cache/
+backend/.cache/
+
+# Alembic
+backend/alembic/__pycache__/
+backend/alembic/versions/*__pycache__/
+backend/alembic/versions/*.pyc
+backend/alembic/versions/*~    # editor backups
+
+# Ignore SQLite (if used for local tests)
+*.sqlite3
+*.db
+
+# -------------------------
+# Logs
+# -------------------------
+*.log
+logs/
+backend/logs/
+
+# -------------------------
+# Docker
+# -------------------------
+# ignore bind-mount build artifacts
+**/.dockerignore
+docker-compose.override.yml
+
+# Volumes (never commit)
+db_data/
+pgadmin_data/
+
+# -------------------------
+# Frontend (if added later)
+# -------------------------
+node_modules/
+dist/
+*.local
+
+# -------------------------
+# Editor / OS files
+# -------------------------
+.DS_Store
+.idea/
+.vscode/
+*.iml
+*.sublime-project
+*.sublime-workspace
+
+# -------------------------
+# Env files
+# --------------
+
