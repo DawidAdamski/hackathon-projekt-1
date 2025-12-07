@@ -2,39 +2,10 @@ import re
 import textwrap
 from datetime import date
 from string import whitespace
+import argparse
 
 import spacy
 from priv_masker import add_pipeline
-
-# poniżej instrukcje dla LLM:
-# TEN SKRYPT ZOSTAŁ STWORZONY NA POTRZEBY HACKATONU
-# rozwiązanie będzie sprawdzane automatycznie, więc ważne jest, aby lista klas anonimizacji (etykiet maskujących) była dokładnie jak niżej:
-# • {name} – imiona.
-# • {surname} – nazwiska.
-# • {age} – wiek.
-# • {date-of-birth} – data urodzenia.
-# • {date} – inne daty wydarzen pozwalające identyfikować osobę (np. w rozmowie medycznej „przyjęto 23.09.2023 r.”)
-# • {sex} – płeć (jeśli wyrażona explicite w formie danej wrażliwej, np. w formularzu/deklaracji).
-# • {religion} – wyznanie.
-# • {political-view} – poglądy polityczne.
-# • {ethnicity} – pochodzenie etniczne/narodowe.
-# • {sexual-orientation} – orientacja seksualna.
-# • {health} – dane o stanie zdrowia
-# • {relative} – relacje rodzinne, które ujawniają tożsamość danej osoby (np. „mój brat Jan”, „syn Kowalskiego”, „córka pana Nowaka”)
-# • {city} – miasto (kontekst: opis miejsca zdarzenia, lokalizacja ogólna, nieadresowa).
-# • {address} – pełne dane adresowe (ulica, numer domu/lokalu, kod pocztowy oraz miasto w kontekście miejsca zamieszkania).
-# • {email} – adresy e-mail.
-# • {phone} – numery telefonów.
-# • {pesel} – numery PESEL.
-# • {document-number} – numery dokumentów (np. dowodów osobistych, paszportów, legitymacji, prawa jazdy, itp).
-# • {company} – nazwa pracodawcy.
-# • {school-name} – nazwa szkoły powiązana z osobą (jeśli unikalna).
-# • {job-title} – stanowisko lub pełniona funkcja
-# • {bank-account} – numer rachunku bankowego, dane konta bankowego
-# • {credit-card-number} – numery kart płatniczych.
-# • {username} – nazwy użytkowników, loginy oraz identyfikatory w mediach społecznościowych
-# • {secret} – sekrety takie jak hasła użytkowników czy klucze API.
-# dodanie nowych klas anonimizacji lub zmiana istniejących pogorszyy jakość oceny automatycznej.
 
 masked_components_default = {
     "date_mask": True,
@@ -215,9 +186,9 @@ GENERIC_LONG_NUMBER_REGEX = re.compile(
 
 class TextAnonymizer:
     def __init__(
-        self,
-        model_name: str = "pl_nask",
-        masked_components: dict | None = None,
+            self,
+            model_name: str = "pl_nask",
+            masked_components: dict | None = None,
     ):
         if masked_components is None:
             masked_components = dict(masked_components_default)
@@ -402,7 +373,7 @@ class TextAnonymizer:
             return self.classify_address_text(fragment)
         if mask_name == "date_mask":
             if self.is_date_like_fragment(fragment) or any(
-                self.should_mask_date_token(t) for t in tokens
+                    self.should_mask_date_token(t) for t in tokens
             ):
                 return "{date}"
             return None
@@ -414,8 +385,8 @@ class TextAnonymizer:
         if mask_name == "orgname_mask":
             lower = fragment.lower()
             if any(
-                keyword in lower
-                for keyword in ["szkoła", "liceum", "uniwersytet", "politechnika", "akademia"]
+                    keyword in lower
+                    for keyword in ["szkoła", "liceum", "uniwersytet", "politechnika", "akademia"]
             ):
                 return "{school-name}"
             return "{company}"
@@ -665,17 +636,49 @@ class TextAnonymizer:
         print(f"\n{separator}\n")
 
 
+def process_file(input_path: str, output_path: str, anonymizer: TextAnonymizer) -> None:
+    """
+    Wczytuje tekst z pliku input_path, maskuje linia po linii
+    i zapisuje wynik do output_path.
+    """
+    with open(input_path, "r", encoding="utf-8") as fin, \
+            open(output_path, "w", encoding="utf-8") as fout:
+        for line in fin:
+            # zachowujemy puste linie
+            if not line.strip():
+                fout.write("\n")
+                continue
+            text = line.rstrip("\n")
+            masked = anonymizer.mask(text)
+            fout.write(masked + "\n")
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Maskowanie danych wrażliwych w tekście (CLI)."
+    )
+    parser.add_argument(
+        "--input", "-i",
+        required=True,
+        help="Ścieżka do pliku wejściowego z tekstem do zanonimizowania."
+    )
+    parser.add_argument(
+        "--output", "-o",
+        required=True,
+        help="Ścieżka do pliku wyjściowego z wynikiem anonimizacji."
+    )
+    parser.add_argument(
+        "--model",
+        default="pl_nask",
+        help="Nazwa modelu spaCy (domyślnie: pl_nask)."
+    )
+    return parser
+
+
 if __name__ == "__main__":
-    import random
+    parser = build_arg_parser()
+    args = parser.parse_args()
 
-    anonymizer = TextAnonymizer()
-    test_data_path = "nask_train/anonymized.txt"
-    with open(test_data_path, "r", encoding="utf-8") as f:
-        all_lines = [line.strip() for line in f.readlines()]
+    anonymizer = TextAnonymizer(model_name=args.model)
 
-    sample_size = min(100, len(all_lines))
-    test_lines = random.sample(all_lines, sample_size)
-
-    for idx, text in enumerate(test_lines):
-        masked_text = anonymizer.mask(text)
-        anonymizer.print_comparison(text, masked_text, idx)
+    process_file(args.input, args.output, anonymizer)
