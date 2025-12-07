@@ -9,7 +9,7 @@ llm:
   model: "ollama/PRIHLOP/PLLuM:latest"
   
   # Alternatywne modele local:
-  # model: "ollama/gemma3:12b"
+  # model: "ollama/gpt-oss:latest"
   # model: "ollama/llama3.1:latest"
   
   # Konfiguracja modelu online (PLLuM API)
