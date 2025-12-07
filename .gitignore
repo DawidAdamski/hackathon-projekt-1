@@ -146,4 +146,4 @@ yarn-error.log*
 # Backup files
 *.backup
 *.old
-
+/spacy_models/
