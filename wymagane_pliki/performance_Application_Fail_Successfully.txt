@@ -1,4 +1,7 @@
-Time: 26-30 sekund na linię (średnio)
+Time: 
+- Moduł synthesize (synteza danych): 26-30 sekund na linię (średnio)
+- Cały workflow (anonimizacja + synteza): może być dłuższy w zależności od złożoności tekstu
+
 (Czas przetwarzania w sekundach - od załadowania tekstu do zapisu wyniku. Nie wliczaj czasu ładowania modelu/bibliotek do pamięci)
 
 Hardware:
