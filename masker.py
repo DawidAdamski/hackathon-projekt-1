@@ -164,6 +164,12 @@ DOCUMENT_NUMBER_CONTEXT_REGEX = re.compile(
     re.IGNORECASE,
 )
 
+# Nowa heurystyka: numer dowodu osobistego w kontekście słów "dowód" / "numer dowodu"
+ID_CARD_CONTEXT_REGEX = re.compile(
+    r"\b(?:dow[oó]d|numer\s+dowodu)\b[^\n\r]{0,30}",
+    re.IGNORECASE,
+)
+
 MONTH_WORDS = {
     "stycznia",
     "lutego",
@@ -424,6 +430,7 @@ class TextAnonymizer:
                     return
             spans.append((start, end, placeholder))
 
+        # PESEL i warianty
         for match in PESEL_REGEX.finditer(text):
             if self.is_valid_pesel(match.group(0)):
                 add_span(match.start(), match.end(), "{pesel}")
@@ -437,6 +444,7 @@ class TextAnonymizer:
             if normalized is not None:
                 add_span(match.start(), match.end(), "{pesel}")
 
+        # Daty urodzenia + inne daty
         for match in DOB_REGEX.finditer(text):
             add_span(match.start(1), match.end(1), "{date-of-birth}")
 
@@ -449,6 +457,7 @@ class TextAnonymizer:
         for match in DATE_D_MONTH_Y_REGEX.finditer(text):
             add_span(match.start(), match.end(), "{date}")
 
+        # Rachunki, karty
         for match in BANK_ACCOUNT_REGEX.finditer(text):
             add_span(match.start(), match.end(), "{bank-account}")
 
@@ -456,6 +465,7 @@ class TextAnonymizer:
             if self.is_valid_credit_card(match.group(0)):
                 add_span(match.start(), match.end(), "{credit-card-number}")
 
+        # Telefony w kontekście
         for match in PHONE_CONTEXT_REGEX.finditer(text):
             raw_fragment = match.group(1)
             normalized = self.normalize_phone_candidate(raw_fragment)
@@ -464,6 +474,7 @@ class TextAnonymizer:
                 end = match.end(1)
                 add_span(start, end, "{phone}")
 
+        # Numery dokumentów w kontekście NIP/REGON/Nr...
         for m in re.finditer(r"\b(?:NIP|REGON|Nr|nr|ZDP|GK|GN|MAP|Ewid|EWID)\b[^\n\r]{0,30}", text):
             prefix_end = m.end()
             num_match = re.search(r"\d[\d\s\-]{5,}", text[prefix_end:prefix_end + 40])
@@ -475,6 +486,17 @@ class TextAnonymizer:
                     add_span(start, end, "{date}")
                 else:
                     add_span(start, end, "{document-number}")
+
+        # NOWA HEURYSTYKA: numery dowodu osobistego w kontekście "dowód" / "numer dowodu"
+        for m in ID_CARD_CONTEXT_REGEX.finditer(text):
+            ctx_end = m.end()
+            segment = text[ctx_end:ctx_end + 30]
+            # typowe serie: 2–3 litery + 3–7 cyfr, np. HJG433, WL6371
+            series_match = re.search(r"\b([A-Za-z]{2,3}\d{3,7})\b", segment)
+            if series_match:
+                start = ctx_end + series_match.start(1)
+                end = ctx_end + series_match.end(1)
+                add_span(start, end, "{document-number}")
 
         pattern_placeholders = [
             (AGE_REGEX, "{age}"),
@@ -500,6 +522,7 @@ class TextAnonymizer:
             for match in pattern.finditer(text):
                 add_span(match.start(), match.end(), placeholder)
 
+        # Telefony bez kontekstu
         for match in PHONE_REGEX.finditer(text):
             start, end = match.start(), match.end()
             overlap = False
@@ -515,6 +538,7 @@ class TextAnonymizer:
             else:
                 add_span(start, end, "{phone}")
 
+        # Długie numery ogólne
         for match in GENERIC_LONG_NUMBER_REGEX.finditer(text):
             start, end = match.start(), match.end()
             fragment = text[start:end]
