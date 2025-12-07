@@ -1,0 +1,2 @@
+"""Testy dla modułu synthesize."""
+

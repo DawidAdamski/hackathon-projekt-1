@@ -1,0 +1,72 @@
+# Configuration for PLLuM Anonymizer
+
+# LLM Configuration
+llm:
+  # Mode: "online" (PLLuM API) or "local" (Ollama)
+  mode: "online"  # or "local"
+  
+  # System prompt for LLM (optional, used if provided)
+  system_prompt: |
+    Jesteś ekspertem od generowania syntetycznych danych osobowych w języku polskim.
+    Twoim zadaniem jest generowanie realistycznych, polskich danych, które zastępują dane osobowe (PII).
+    Zawsze generuj tylko dane, bez dodatkowych wyjaśnień czy komentarzy.
+    Zachowaj spójność - jeśli w kontekście jest imię męskie, użyj męskich form.
+  
+  # Online mode settings (PLLuM API)
+  online:
+    base_url: "https://apim-pllum-tst-pcn.azure-api.net/vllm/v1"
+    model_name: "CYFRAGOVPL/pllum-12b-nc-chat-250715"
+    temperature: 0.7
+    max_tokens: 300
+  
+  # Local mode settings (Ollama)
+  local:
+    base_url: "http://localhost:11434"  # Default Ollama URL
+    model_name: "PRIHLOP/PLLuM:latest"
+    temperature: 0.7
+    max_tokens: 300
+
+# Entity labels mapping
+entity_labels:
+  # Person names
+  "{name}": "first_name"
+  "{surname}": "last_name"
+  
+  # Location
+  "{city}": "city"
+  "{address}": "address"
+  
+  # Contact
+  "{phone}": "phone_number"
+  "{email}": "email"
+  
+  # Identity documents
+  "{pesel}": "pesel"
+  "{document-number}": "document_number"
+  
+  # Other
+  "{age}": "age"
+  "{sex}": "gender"
+  "{company}": "company"
+  "{date}": "date"
+  "{data}": "date"
+  "{bank-account}": "bank_account"
+  
+  # Sensitive categories
+  "{political-view}": "political_view"
+  "{health}": "health"
+  "{relative}": "relative"
+
+# Model paths
+models:
+  spacy_model: "pl_core_news_lg"
+  gliner_model: "urchade/gliner_small-v2.1"
+
+# Faker locale
+faker_locale: "pl_PL"
+
+# Synthesis settings
+synthesis:
+  preserve_morphology: true
+  fallback_to_simple: true
+

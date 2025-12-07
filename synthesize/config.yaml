@@ -1,0 +1,43 @@
+# Konfiguracja modułu Synthesize
+
+# Model LLM
+llm:
+  # Tryb: "local" (Ollama) lub "online" (PLLuM API)
+  mode: "local"  # lub "online"
+  
+  # Domyślny model (Ollama local)
+  model: "ollama/PRIHLOP/PLLuM:latest"
+  
+  # Alternatywne modele local:
+  # model: "ollama/gemma3:12b"
+  # model: "ollama/llama3.1:latest"
+  
+  # Konfiguracja modelu online (PLLuM API)
+  # Wymaga zmiennej środowiskowej PLLUM_API_KEY
+  online:
+    base_url: "https://apim-pllum-tst-pcn.azure-api.net/vllm/v1"
+    model_name: "CYFRAGOVPL/pllum-12b-nc-chat-250715"
+    # api_key: pobierane z PLLUM_API_KEY env var
+
+# Faker
+faker:
+  locale: "pl_PL"
+
+# Output
+output:
+  generate_jsonl: true
+  encoding: "utf-8"
+
+# Przetwarzanie
+processing:
+  # Użyj LLM domyślnie
+  use_llm: true
+  
+  # Użyj pełnych promptów zamiast dspy.Predict (wolniejsze ale lepsze)
+  use_prompt_mode: false
+
+# Ścieżki domyślne
+paths:
+  default_input: "../nask_train/orig.txt"
+  default_output: "./output"
+
