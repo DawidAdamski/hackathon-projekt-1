@@ -350,7 +350,7 @@ def process_file(input_path: str, output_path: str):
 ```yaml
 # config.yaml
 llm:
-  model: "ollama/PRIHLOP/PLLuM:latest"  # lub "ollama/gemma3:12b"
+  model: "ollama/PRIHLOP/PLLuM:latest"  # lub "ollama/gpt-oss:latest"
 
 faker:
   locale: "pl_PL"

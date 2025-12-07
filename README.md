@@ -52,7 +52,6 @@ uv pip install -e .
 ollama pull PRIHLOP/PLLuM:latest
 # lub alternatywnie:
 ollama pull gpt-oss:latest
-ollama pull gemma3:12b
 ```
 
 #### Konfiguracja zmiennych środowiskowych
