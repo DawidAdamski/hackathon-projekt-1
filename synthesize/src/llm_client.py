@@ -63,20 +63,56 @@ def init_llm(
             )
         
         # Ustaw nagłówek dla LiteLLM (PLLuM API wymaga Ocp-Apim-Subscription-Key)
+        # Musimy ustawić to PRZED utworzeniem dspy.LM, bo DSPy używa LiteLLM wewnętrznie
         try:
             import litellm
-            litellm.headers = {"Ocp-Apim-Subscription-Key": api_key}
+            # os jest już zaimportowane na górze pliku
+            
+            # Metoda 1: Ustaw globalne nagłówki dla LiteLLM - to jest główna metoda
+            # LiteLLM użyje tych nagłówków dla wszystkich wywołań OpenAI-compatible
+            # WAŻNE: litellm.headers dodaje nagłówki, ale NIE nadpisuje Authorization
+            # Musimy usunąć Authorization i użyć tylko Ocp-Apim-Subscription-Key
+            litellm.headers = {
+                "Ocp-Apim-Subscription-Key": api_key,
+                # NIE dodajemy Authorization - PLLuM API nie używa Bearer token
+            }
+            
+            # Metoda 2: Ustaw również OPENAI_API_KEY jako backup (wymagane przez LiteLLM)
+            # Ale nie będzie używane jako Authorization, bo mamy litellm.headers
+            os.environ["OPENAI_API_KEY"] = api_key  # Wymagane przez LiteLLM do inicjalizacji
+            
+            # Metoda 3: Wyłącz verbose (można włączyć dla debugowania)
+            litellm.set_verbose = False
+            
         except ImportError:
             pass  # litellm może nie być dostępne, ale DSPy powinno działać
         
         # Utwórz model OpenAI-compatible
         openai_model = f"openai/{model_name}" if not model_name.startswith("openai/") else model_name
         
+        # Utwórz DSPy LM - DSPy używa LiteLLM wewnętrznie
+        # Przekazujemy api_key (wymagane przez LiteLLM), ale litellm.headers nadpisze Authorization
+        # Nagłówek Ocp-Apim-Subscription-Key jest już ustawiony w litellm.headers
+        # Próbujemy również przekazać extra_headers przez kwargs (jeśli DSPy/LiteLLM to obsługuje)
         _lm = dspy.LM(
             model=openai_model,
-            api_key=api_key,
+            api_key=api_key,  # Wymagane przez LiteLLM do inicjalizacji klienta
             api_base=base_url,
+            # litellm.headers nadpisze Authorization: Bearer na Ocp-Apim-Subscription-Key
+            # Próbujemy również przekazać extra_headers (jeśli DSPy/LiteLLM to obsługuje)
+            extra_headers={"Ocp-Apim-Subscription-Key": api_key},  # Backup - przez kwargs
         )
+        
+        # Sprawdź czy nagłówki są ustawione (dla debugowania)
+        try:
+            import litellm
+            if hasattr(litellm, 'headers') and litellm.headers:
+                print(f"  Headers: {list(litellm.headers.keys())}")
+                # Sprawdź również, czy nagłówki są faktycznie ustawione
+                if "Ocp-Apim-Subscription-Key" in litellm.headers:
+                    print(f"  ✓ Ocp-Apim-Subscription-Key header set")
+        except:
+            pass
         
         dspy.configure(lm=_lm)
         print(f"✓ LLM initialized (online): {model_name}")
