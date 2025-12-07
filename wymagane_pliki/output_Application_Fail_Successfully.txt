@@ -1,0 +1,27 @@
+# Wyjaśnienie dotyczące pliku output_Application_Fail_Successfully.txt
+
+Szanowni Organizatorzy,
+
+Z przykrością informujemy, że nie jesteśmy w stanie dostarczyć przykładowego pliku output_Application_Fail_Successfully.txt w momencie składania projektu.
+
+## Powody:
+
+1. **Priorytetyzacja poprawności rozwiązania:**
+   W trakcie hackathonu skupiliśmy się przede wszystkim na zapewnieniu poprawności działania naszego algorytmu anonimizacji i syntezy danych. Skoncentrowaliśmy się na implementacji funkcjonalności, testowaniu jakości wyników oraz zapewnieniu poprawnej obsługi fleksji języka polskiego.
+
+2. **Brak wystarczającego czasu:**
+   Informacja o wymaganiu przykładowego pliku output została przekazana wczoraj wieczorem (około godziny 22), co nie pozostawiło nam wystarczającego czasu na wygenerowanie pełnego pliku wynikowego na podstawie danych testowych, przy jednoczesnym zachowaniu wysokiej jakości rozwiązania.
+
+## Nasze rozwiązanie:
+
+Nasz kod jest w pełni funkcjonalny i gotowy do użycia. Moduły anonimizacji i syntezy danych działają poprawnie i mogą być uruchomione na dostarczonych danych testowych w celu wygenerowania pliku output zgodnego z wymaganiami.
+
+## Gotowość do weryfikacji:
+
+Jesteśmy gotowi do:
+- Przedstawienia działania naszego rozwiązania w czasie rzeczywistym
+- Wygenerowania pliku output na żądanie organizatorów
+- Udzielenia wszelkich wyjaśnień dotyczących działania algorytmu
+
+Z poważaniem,  
+Zespół Application Fail Successfully
