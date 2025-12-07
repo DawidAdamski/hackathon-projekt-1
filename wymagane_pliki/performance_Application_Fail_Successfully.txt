@@ -1,0 +1,15 @@
+Time: 
+- Moduł synthesize (synteza danych): 26-30 sekund na linię (średnio)
+- Cały workflow (anonimizacja + synteza): może być dłuższy w zależności od złożoności tekstu
+
+(Czas przetwarzania w sekundach - od załadowania tekstu do zapisu wyniku. Nie wliczaj czasu ładowania modelu/bibliotek do pamięci)
+
+Hardware:
+Typ: CPU + GPU
+Model: AMD Ryzen 9 7950X + NVIDIA GeForce RTX 4080
+
+API:
+Czy użyto API PLLUM lub własnego modelu postawionego na zewnętrznym serwerze? TAK
+Jeżeli model inny niż PLLUM, podajcie jaki to model i w jaki sposób postawiony: 
+Testy były przeprowadzone zarówno na modelu online (PLLuM API) jak i na modelu lokalnym (PLLuM przez Ollama). Głównie opieraliśmy się na modelu PLLuM. Model lokalny był uruchomiony przez Ollama na komputerze z procesorem AMD Ryzen 9 7950X i kartą graficzną NVIDIA RTX 4080.
+
