@@ -15,8 +15,19 @@ Projekt hackathonowy stworzony podczas HackNation (06.12.2025-07.12.2025), mają
 ## 🔧 Instalacja i konfiguracja
 
 ### Część 1: Moduł anonimizacji
+### Część 1: Moduł maskowania danych osobowych []
 
-> **Uwaga:** Instrukcja instalacji i konfiguracji modułu anonimizacji będzie uzupełniona przez członka zespołu odpowiedzialnego za tę część projektu.
+py -3.11 -m venv .venv
+call .\.venv\Scripts\activate.bat
+pip install -r requirements.txt
+python -m pip install pl_nask-0.0.7.tar.gz
+
+python -m pip install -U pip setuptools wheel
+python -m pip uninstall -y spacy thinc numpy
+python -m pip install "numpy<2"
+python -m pip install -U spacy
+
+copy contact_masker.py ".venv\Lib\site-packages\priv_masker\masks\contact_masker.py"
 
 ---
 
