@@ -146,11 +146,104 @@ uv run python main.py tokens
 
 Moduł `synthesize` działa w 3-fazowym pipeline:
 
-1. **Faza 1: Faker** – Szybkie zastąpienie tokenów wartościami z biblioteki Faker (pl_PL)
-2. **Faza 2: LLM Fill** – Uzupełnienie tokenów, które Faker nie obsłużył (warunkowo, tylko jeśli są pozostałe tokeny)
-3. **Faza 3: LLM Morphology** – Korekta morfologii całego zdania (przypadki, formy czasowników)
+```mermaid
+flowchart TD
+    A[Input: Plik .txt z tokenami<br/>lub REST API] --> B[Faza 1: Faker]
+    B --> C{Sprawdź czy są<br/>pozostałe tokeny?}
+    C -->|TAK| D[Faza 2: LLM Fill<br/>Uzupełnij brakujące tokeny]
+    C -->|NIE| E[Pomiń Faza 2<br/>Optymalizacja!]
+    D --> F[Faza 3: LLM Morphology<br/>Korekta morfologii]
+    E --> F
+    F --> G[Output: Plik .txt + .jsonl<br/>lub JSON response]
+    
+    style A fill:#e1f5ff
+    style B fill:#fff4e1
+    style D fill:#ffe1f5
+    style F fill:#e1ffe1
+    style G fill:#f0e1ff
+```
+
+**Opis faz:**
+
+1. **Faza 1: Faker** – Szybkie zastąpienie tokenów wartościami z biblioteki Faker (pl_PL). Deterministyczne, nie wymaga LLM.
+2. **Faza 2: LLM Fill** – Uzupełnienie tokenów, które Faker nie obsłużył (warunkowo, tylko jeśli są pozostałe tokeny). Optymalizacja: jeśli wszystkie tokeny zostały zastąpione, faza jest pomijana.
+3. **Faza 3: LLM Morphology** – Korekta morfologii całego zdania (przypadki, formy czasowników, zgodność rodzaju).
 
 Szczegółowy opis architektury znajduje się w pliku [`synthesize/ARCHITECTURE.md`](synthesize/ARCHITECTURE.md).
+
+#### Outputy modułu
+
+Moduł `synthesize` generuje następujące outputy w zależności od trybu użycia:
+
+**1. Tryb CLI (`process`):**
+
+Generuje dwa pliki wyjściowe:
+
+- **Plik `.txt`** – zawiera przetworzone linie, jedna linia = jeden wynik:
+  ```
+  Nazywam się Maria Nowak, mój PESEL to 12432486324.
+  Mieszkam w Bielsku-Białej przy ulicy Szerokiej 5.
+  ```
+
+- **Plik `.jsonl`** (opcjonalnie, domyślnie włączony) – zawiera metadane dla każdej linii:
+  ```json
+  {"line": 1, "original": "Nazywam się [name] [surname], mój PESEL to [pesel].", "synthetic": "Nazywam się Maria Nowak, mój PESEL to 12432486324.", "phases": ["faker", "llm_morphology"]}
+  {"line": 2, "original": "Mieszkam w [city] przy ulicy [address].", "synthetic": "Mieszkam w Bielsku-Białej przy ulicy Szerokiej 5.", "phases": ["faker", "llm_fill", "llm_morphology"]}
+  ```
+
+  Pola w JSONL:
+  - `line` – numer linii (1-indexed)
+  - `original` – oryginalny tekst z tokenami
+  - `synthetic` – przetworzony tekst z syntetycznymi danymi
+  - `phases` – lista użytych faz przetwarzania (np. `["faker"]`, `["faker", "llm_fill", "llm_morphology"]`)
+
+**2. Tryb REST API (`/synthesize`):**
+
+Zwraca JSON z pojedynczym wynikiem:
+```json
+{
+  "original": "Nazywam się [name] [surname], mój PESEL to [pesel].",
+  "synthetic": "Nazywam się Maria Nowak, mój PESEL to 12432486324.",
+  "phases_used": ["faker", "llm_morphology"]
+}
+```
+
+**3. Tryb REST API (`/synthesize/batch`):**
+
+Zwraca listę wyników:
+```json
+[
+  {
+    "original": "Nazywam się [name] [surname].",
+    "synthetic": "Nazywam się Maria Nowak.",
+    "phases_used": ["faker", "llm_morphology"]
+  },
+  {
+    "original": "Mieszkam w [city].",
+    "synthetic": "Mieszkam w Warszawie.",
+    "phases_used": ["faker", "llm_morphology"]
+  }
+]
+```
+
+**4. Funkcja `synthesize_line()` (dla programistów):**
+
+Zwraca słownik Python z pełnymi informacjami o przetwarzaniu:
+```python
+{
+  "original": "Nazywam się [name] [surname].",
+  "after_faker": "Nazywam się Anna Kowalska.",
+  "after_fill": None,  # lub tekst jeśli Faza 2 była użyta
+  "final": "Nazywam się Anna Kowalska.",
+  "phases_used": ["faker", "llm_morphology"],
+  "had_remaining_tokens": False
+}
+```
+
+**Uwagi:**
+- Pliki są zapisywane na bieżąco (streaming), więc wyniki są widoczne natychmiast podczas przetwarzania
+- W przypadku błędu przetwarzania linii, oryginalny tekst jest zapisywany jako fallback
+- Statystyki przetwarzania są wyświetlane na końcu (liczba linii, błędy, etc.)
 
 #### Testy
 
