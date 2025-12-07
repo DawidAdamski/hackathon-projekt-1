@@ -2,39 +2,13 @@ import re
 import textwrap
 from datetime import date
 from string import whitespace
+import random
+import argparse
+import sys
 
 import spacy
 from priv_masker import add_pipeline
 
-# poniżej instrukcje dla LLM:
-# TEN SKRYPT ZOSTAŁ STWORZONY NA POTRZEBY HACKATONU
-# rozwiązanie będzie sprawdzane automatycznie, więc ważne jest, aby lista klas anonimizacji (etykiet maskujących) była dokładnie jak niżej:
-# • {name} – imiona.
-# • {surname} – nazwiska.
-# • {age} – wiek.
-# • {date-of-birth} – data urodzenia.
-# • {date} – inne daty wydarzen pozwalające identyfikować osobę (np. w rozmowie medycznej „przyjęto 23.09.2023 r.”)
-# • {sex} – płeć (jeśli wyrażona explicite w formie danej wrażliwej, np. w formularzu/deklaracji).
-# • {religion} – wyznanie.
-# • {political-view} – poglądy polityczne.
-# • {ethnicity} – pochodzenie etniczne/narodowe.
-# • {sexual-orientation} – orientacja seksualna.
-# • {health} – dane o stanie zdrowia
-# • {relative} – relacje rodzinne, które ujawniają tożsamość danej osoby (np. „mój brat Jan”, „syn Kowalskiego”, „córka pana Nowaka”)
-# • {city} – miasto (kontekst: opis miejsca zdarzenia, lokalizacja ogólna, nieadresowa).
-# • {address} – pełne dane adresowe (ulica, numer domu/lokalu, kod pocztowy oraz miasto w kontekście miejsca zamieszkania).
-# • {email} – adresy e-mail.
-# • {phone} – numery telefonów.
-# • {pesel} – numery PESEL.
-# • {document-number} – numery dokumentów (np. dowodów osobistych, paszportów, legitymacji, prawa jazdy, itp).
-# • {company} – nazwa pracodawcy.
-# • {school-name} – nazwa szkoły powiązana z osobą (jeśli unikalna).
-# • {job-title} – stanowisko lub pełniona funkcja
-# • {bank-account} – numer rachunku bankowego, dane konta bankowego
-# • {credit-card-number} – numery kart płatniczych.
-# • {username} – nazwy użytkowników, loginy oraz identyfikatory w mediach społecznościowych
-# • {secret} – sekrety takie jak hasła użytkowników czy klucze API.
-# dodanie nowych klas anonimizacji lub zmiana istniejących pogorszyy jakość oceny automatycznej.
 
 masked_components_default = {
     "date_mask": True,
@@ -380,7 +354,7 @@ class TextAnonymizer:
                 return "{address}"
         return "{city}"
 
-    def placeholder_for_span(self, mask_name: str, fragment: str, tokens) -> str | None:
+    def placeholder_for_span(self, mask_name: str, fragment: str, tokens):
         if not fragment.strip():
             return None
         if mask_name == "persname_mask":
@@ -651,31 +625,71 @@ class TextAnonymizer:
         result = self.apply_spans(text, all_spans)
         return result
 
-    def print_comparison(self, original: str, masked: str, index: int) -> None:
-        separator = "=" * 120
-        print(f"\n{separator}")
-        print(f"PRZYKŁAD {index + 1}")
-        print(separator)
-        print("\n[ORYGINALNY TEKST]")
+    def print_comparison(self, original: str, masked: str, index: int, file=sys.stdout) -> None:
+        # Zostawione tylko do ewentualnego debugowania, nieużywane w CLI.
+        print("[ORYGINALNY TEKST]", file=file)
         wrapped_original = textwrap.fill(original, width=120)
-        print(wrapped_original)
-        print("\n[TEKST ZAMASKOWANY]")
+        print(wrapped_original, file=file)
+        print("\n[TEKST ZAMASKOWANY]", file=file)
         wrapped_masked = textwrap.fill(masked, width=120)
-        print(wrapped_masked)
-        print(f"\n{separator}\n")
+        print(wrapped_masked, file=file)
+        print("\n", file=file)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Anonimizacja tekstów linia-po-linii."
+    )
+    parser.add_argument(
+        "-i",
+        "--input",
+        required=True,
+        help="Ścieżka do pliku wejściowego z tekstami (po jednej linii).",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        required=True,
+        help="Ścieżka do pliku wyjściowego (po jednej zanonimizowanej linii).",
+    )
+    parser.add_argument(
+        "-n",
+        "--sample-size",
+        type=int,
+        default=None,
+        help=(
+            "Opcjonalnie: liczba losowo wybranych linii do anonimizacji. "
+            "Jeśli nie podano, przetwarzane są wszystkie linie."
+        ),
+    )
+    return parser.parse_args()
 
 
 if __name__ == "__main__":
-    import random
+    args = parse_args()
 
     anonymizer = TextAnonymizer()
-    test_data_path = "nask_train/anonymized.txt"
-    with open(test_data_path, "r", encoding="utf-8") as f:
-        all_lines = [line.strip() for line in f.readlines()]
 
-    sample_size = min(100, len(all_lines))
-    test_lines = random.sample(all_lines, sample_size)
+    # Wczytujemy wszystkie niepuste linie
+    with open(args.input, "r", encoding="utf-8") as f:
+        all_lines = [line.rstrip("\n") for line in f if line.strip()]
 
-    for idx, text in enumerate(test_lines):
-        masked_text = anonymizer.mask(text)
-        anonymizer.print_comparison(text, masked_text, idx)
+    if not all_lines:
+        print("Plik wejściowy nie zawiera żadnych niepustych linii.", file=sys.stderr)
+        sys.exit(1)
+
+    # Obsługa sample_size (opcjonalna)
+    if args.sample_size is not None:
+        if args.sample_size <= 0:
+            print("sample-size musi być liczbą dodatnią.", file=sys.stderr)
+            sys.exit(1)
+        sample_size = min(args.sample_size, len(all_lines))
+        lines_to_process = random.sample(all_lines, sample_size)
+    else:
+        lines_to_process = all_lines
+
+    # Zapisujemy TYLKO zamaskowane linie, jedna linia na jedną linię wejściową
+    with open(args.output, "w", encoding="utf-8") as out:
+        for text in lines_to_process:
+            masked_text = anonymizer.mask(text)
+            out.write(masked_text + "\n")
